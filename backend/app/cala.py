@@ -52,6 +52,7 @@ class CalaClient:
 class EvidenceBundle:
     evidence: list[Evidence] = field(default_factory=list)
     summaries: dict[str, str] = field(default_factory=dict)
+    entities: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
     mode: str = "cala"
 
@@ -128,7 +129,14 @@ def _sources_from_origins(origins: list[dict[str, Any]] | None) -> list[Source]:
     return sources[:3]
 
 
+def _ingest_entities(bundle: EvidenceBundle, kind: str, payload: dict[str, Any]) -> None:
+    for entity in payload.get("entities") or []:
+        if isinstance(entity, dict) and entity.get("id"):
+            bundle.entities.setdefault(kind, []).append(entity)
+
+
 def _ingest_search(bundle: EvidenceBundle, kind: str, payload: dict[str, Any]) -> None:
+    _ingest_entities(bundle, kind, payload)
     context = payload.get("context") or []
     if payload.get("content"):
         # Cala's synthesised answer, cited with the documents it was built from.
@@ -150,6 +158,7 @@ def _ingest_search(bundle: EvidenceBundle, kind: str, payload: dict[str, Any]) -
 
 
 def _ingest_query(bundle: EvidenceBundle, kind: str, payload: dict[str, Any]) -> None:
+    _ingest_entities(bundle, kind, payload)
     for row in (payload.get("results") or [])[:MAX_ROWS]:
         if not isinstance(row, dict):
             continue

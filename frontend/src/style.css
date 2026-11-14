@@ -352,3 +352,33 @@ textarea { resize: vertical; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }
+
+/* Graph verification */
+.inv { display: flex; gap: 0.7rem; border: 1px solid var(--line); border-radius: 12px; padding: 0.8rem 0.9rem; height: 100%; }
+.inv.conflict { border-color: color-mix(in srgb, var(--bad) 55%, var(--line)); }
+.inv-body { flex: 1; min-width: 0; }
+.inv-top { display: flex; justify-content: space-between; gap: 0.5rem; }
+.inv .why { margin: 0.35rem 0; font-size: 0.9rem; }
+.inv.compact .why { font-size: 0.85rem; }
+.badges { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.6rem; margin: 0.45rem 0 0.2rem; }
+.vbadge { font-size: 0.72rem; font-weight: 700; padding: 0.12rem 0.5rem; border-radius: 999px; }
+.vbadge.ok { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+.vbadge.none { background: var(--panel-2); color: var(--muted); }
+.vbadge.pending { background: var(--panel-2); color: var(--muted); animation: pulse 1.4s ease-in-out infinite; }
+.activity { font-size: 0.78rem; color: var(--muted); }
+.conflict-line { margin: 0.3rem 0; font-size: 0.85rem; color: var(--bad); display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
+.conflict-line .cites { margin: 0; }
+.portfolio { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; margin: 0.35rem 0; }
+.pchip { font-size: 0.74rem; padding: 0.1rem 0.45rem; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--line); }
+.pchip.hit { border-color: var(--bad); color: var(--bad); }
+.leads > li { list-style: none; }
+.pitch-card .lead-row { align-items: stretch; }
+.avoid { margin: 0 0 0.6rem; color: var(--bad); }
+.soft-conflict { margin: 0.3rem 0; font-size: 0.82rem; color: var(--mid); display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
+.soft-conflict .cites { margin: 0; }
+.backers { list-style: none; padding: 0; margin: 0.6rem 0 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.backers li { display: grid; grid-template-columns: minmax(8rem, 12rem) 1.2rem 1fr; align-items: center; gap: 0.4rem; font-size: 0.9rem; }
+.bchips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.arrow { color: var(--muted); text-align: center; }
+.replay-note { margin: 0.2rem 0; color: var(--accent); }
+@media (max-width: 680px) { .backers li { grid-template-columns: 1fr; } .arrow { display: none; } }

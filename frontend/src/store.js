@@ -1,6 +1,7 @@
 import { computed, reactive } from "vue";
-import { analyze, health } from "./api.js";
+import { analyze, examples, health } from "./api.js";
 
+// Fallback examples; the backend list (with cached replays) replaces these on load.
 export const EXAMPLES = [
   {
     label: "CSRD reporting SaaS",
@@ -45,10 +46,14 @@ export const KIND_LABELS = {
   funding: "Funding rounds",
   investor: "Investors",
   market: "Company list",
+  graph: "Cala graph",
 };
 
 export const store = reactive({
   modes: null,
+  examples: EXAMPLES,
+  replay: null,
+  graph: [],
   profile: { ...EXAMPLES[0].profile, name: "", description: "", sector: "" },
   submitted: null,
   running: false,
@@ -122,6 +127,8 @@ function reset() {
     evidenceErrors: [],
     plan: null,
     committee: null,
+    replay: null,
+    graph: [],
     finishedAt: 0,
     tab: "overview",
     openEvidenceId: "",
@@ -133,6 +140,10 @@ function onEvent(event) {
     case "start":
       store.question = event.question;
       store.dataMode = event.dataMode;
+      store.replay = event.replay || null;
+      break;
+    case "graph":
+      store.graph = event.competitors || [];
       break;
     case "steps":
       store.steps = event.steps.map((s) => ({ ...s, state: "pending", detail: "", seconds: null, startedAt: null }));
@@ -197,5 +208,11 @@ export async function loadHealth() {
     store.modes = await health();
   } catch {
     store.modes = null;
+  }
+  try {
+    const list = (await examples()).examples;
+    if (list?.length) store.examples = list;
+  } catch {
+    /* keep fallback examples */
   }
 }

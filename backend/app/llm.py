@@ -114,7 +114,8 @@ COMMITTEE_PROMPT = (
     "'Risk partner (bear case)' and 'Sector specialist'. Each gives a stance (back/conditional/pass) on the "
     "startup's round and a short argument citing evidence ids. Then write a consensus. Then list 3-5 investor "
     "targets: ONLY investors whose names appear in the evidence text, with why they fit, fitScore 0..1 and "
-    "evidence ids. Finish with 3-5 concrete next actions for the founder. Use only the provided evidence. "
+    "evidence ids. 'competitorBackersFromCalaGraph' lists investors the Cala knowledge graph links to competitors: "
+    "prefer leads that do not back a direct competitor, and say so when it matters. Finish with 3-5 concrete next actions for the founder. Use only the provided evidence. "
     "Each member 'headline' is at most 12 words; arguments at most 60 words; consensus at most 35 words; "
     "investor 'why' at most 25 words; next actions at most 16 words each, starting with a verb. No markdown."
 )
@@ -146,7 +147,7 @@ async def _gemini_call(settings: Settings, system: str, payload: dict[str, Any],
             "responseMimeType": "application/json",
             "responseJsonSchema": schema,
             "maxOutputTokens": 16000,
-            "temperature": 0.4,
+            "temperature": 0.0,
         },
     }
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent"

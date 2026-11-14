@@ -2,6 +2,8 @@
 import { ref } from "vue";
 import { pct, store } from "../store.js";
 import CiteChips from "./CiteChips.vue";
+import CompetitorBackers from "./CompetitorBackers.vue";
+import InvestorCard from "./InvestorCard.vue";
 import Skeleton from "./Skeleton.vue";
 
 const openMember = ref("");
@@ -34,20 +36,16 @@ const initials = (p) => p.split(" ").slice(0, 2).map((w) => w[0]).join("");
 
     <section class="card">
       <h3>Lead investors to approach</h3>
-      <p class="muted small">Only investors that appear in Cala evidence are shown, ranked by fit.</p>
+      <p class="muted small">Only investors named in Cala evidence. Each is checked in the Cala graph for its portfolio, recent deals and conflicts with your competitors.</p>
       <TransitionGroup v-if="store.committee" tag="ol" name="list" class="leads">
-        <li v-for="(t, i) in store.committee.investorTargets" :key="t.name" class="lead">
-          <span class="rank">#{{ i + 1 }}</span>
-          <div class="lead-body">
-            <div class="lead-top"><b>{{ t.name }}</b><span class="fit">{{ pct(t.fitScore) }} fit</span></div>
-            <div class="fitbar"><span :style="{ width: pct(t.fitScore) }" /></div>
-            <p>{{ t.why }}</p>
-            <CiteChips :ids="t.evidence" />
-          </div>
+        <li v-for="(t, i) in store.committee.investorTargets" :key="t.name">
+          <InvestorCard :target="t" :rank="i + 1" />
         </li>
       </TransitionGroup>
       <Skeleton v-else :lines="3" />
       <p v-if="store.committee && !store.committee.investorTargets.length" class="muted">No investor in the evidence matched well enough.</p>
     </section>
+
+    <CompetitorBackers />
   </div>
 </template>

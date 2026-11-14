@@ -32,7 +32,7 @@ class Source(BaseModel):
 
 class Evidence(BaseModel):
     id: str
-    kind: Literal["competitor", "funding", "investor", "market"]
+    kind: Literal["competitor", "funding", "investor", "market", "graph"]
     title: str = ""
     text: str
     sources: list[Source] = Field(default_factory=list)
@@ -100,11 +100,31 @@ class CommitteeMember(BaseModel):
     evidence: list[str] = Field(default_factory=list)
 
 
+class Conflict(BaseModel):
+    company: str
+    basis: Literal["graph", "evidence"]
+    evidence: str | None = None
+
+
+class InvestorVerification(BaseModel):
+    verified: bool
+    entityId: str | None = None
+    entityName: str | None = None
+    description: str = ""
+    portfolio: list[str] = Field(default_factory=list)
+    portfolioCount: int = 0
+    portfolioCapped: bool = False
+    recentDeals: int = 0
+    latestDeal: str = ""
+    conflicts: list[Conflict] = Field(default_factory=list)
+
+
 class InvestorTarget(BaseModel):
     name: str
     why: str
     fitScore: float = Field(ge=0, le=1)
     evidence: list[str] = Field(default_factory=list)
+    verification: InvestorVerification | None = None
 
 
 class Committee(BaseModel):

@@ -27,6 +27,8 @@ const showDetail = computed(() => store.running || expanded.value);
         <h2 v-if="store.running">{{ current ? current.label : "Starting" }}…</h2>
         <h2 v-else-if="store.error">Stopped</h2>
         <h2 v-else>Done in {{ clock(derived.elapsed) }}</h2>
+        <p v-if="store.replay" class="replay-note small">Example replay of a live run recorded {{ store.replay.recordedAt.slice(0, 10) }}
+          (originally {{ clock(store.replay.originalSeconds) }}). Edit any field for a fresh live run.</p>
         <p class="muted small">
           {{ derived.doneSteps }}/{{ store.steps.length }} steps · {{ store.evidence.length }} sourced facts ·
           {{ derived.sourceCount }} sources

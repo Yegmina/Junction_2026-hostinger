@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from app.config import Settings, get_settings
+from app.examples import find_example, list_examples, replay
 from app.models import StartupProfile
 from app.pipeline import run_analysis
 
@@ -48,13 +49,19 @@ async def health(settings: Annotated[Settings, Depends(get_settings)]):
     return {"status": "ok", "dataMode": settings.data_mode, "analysisMode": settings.analysis_mode}
 
 
+@app.get("/api/examples")
+async def examples():
+    return {"examples": list_examples()}
+
+
 def _sse(event: dict) -> str:
     return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
 
-async def _stream(settings: Settings, profile: StartupProfile) -> AsyncIterator[str]:
+async def _stream(settings: Settings, profile: StartupProfile, example: dict | None = None) -> AsyncIterator[str]:
     try:
-        async for event in run_analysis(settings, profile):
+        events = replay(example) if example else run_analysis(settings, profile)
+        async for event in events:
             yield _sse(event)
     except httpx.HTTPStatusError as exc:
         host = exc.request.url.host
@@ -74,9 +81,12 @@ async def analyze(
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
 ):
-    _rate_limit(request, settings)
+    # Unedited example profiles replay a recorded real run; anything else runs live.
+    example = find_example(profile)
+    if not example:
+        _rate_limit(request, settings)
     return StreamingResponse(
-        _stream(settings, profile),
+        _stream(settings, profile, example),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

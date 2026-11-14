@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { EXAMPLES, eur, runAnalysis, store } from "../store.js";
+import { eur, runAnalysis, store } from "../store.js";
 
 const stages = [
   ["pre-seed", "Pre-seed"],
@@ -21,13 +21,16 @@ const amountHint = computed(() => {
 function useExample(example) {
   Object.assign(store.profile, example.profile);
 }
+const isExample = computed(() =>
+  store.examples.some((e) => e.cached && Object.entries(e.profile).every(([k, v]) => store.profile[k] === v)),
+);
 </script>
 
 <template>
   <form class="card form" @submit.prevent="runAnalysis">
     <div class="examples">
       <span class="muted small">Try an example:</span>
-      <button v-for="ex in EXAMPLES" :key="ex.label" type="button" class="chip" @click="useExample(ex)">{{ ex.label }}</button>
+      <button v-for="ex in store.examples" :key="ex.label" type="button" class="chip" @click="useExample(ex)">{{ ex.label }}</button>
     </div>
     <label>Startup name<input v-model.trim="store.profile.name" required maxlength="120" placeholder="e.g. Ledgerly" /></label>
     <label>What you build
@@ -54,6 +57,6 @@ function useExample(example) {
     </div>
     <p v-if="amountHint.text" :class="['hint', { warnText: amountHint.warn }]">{{ amountHint.text }}</p>
     <button type="submit" class="primary big-btn" :disabled="store.running">Forecast my round</button>
-    <p class="muted small center">Takes about a minute. Every claim links to its Cala source.</p>
+    <p class="muted small center">{{ isExample ? "Example: replays a recorded live run in a few seconds." : "Live run takes about a minute. Every claim links to its Cala source." }}</p>
   </form>
 </template>

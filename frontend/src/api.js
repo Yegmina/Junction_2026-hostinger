@@ -5,6 +5,11 @@ export async function health() {
   return res.json();
 }
 
+export async function examples() {
+  const res = await fetch(`${API_BASE}/api/examples`);
+  return res.json();
+}
+
 // Streams server-sent events from POST /api/analyze and calls onEvent for each one.
 export async function analyze(profile, onEvent, signal) {
   const res = await fetch(`${API_BASE}/api/analyze`, {

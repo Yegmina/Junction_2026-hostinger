@@ -1,6 +1,7 @@
 """Evidence -> drivers -> 2x2 scenarios -> round probability -> investor committee."""
 from __future__ import annotations
 
+import asyncio
 import math
 import time
 import uuid
@@ -10,6 +11,7 @@ from app.cala import QUERY_LABELS, EvidenceBundle, stream_evidence
 from app.config import Settings
 from app.demo import demo_committee, demo_plan
 from app.llm import PESTEL_ENUM, COMMITTEE_PROMPT, COMMITTEE_SCHEMA, PLAN_PROMPT, PLAN_SCHEMA, structured_call
+from app.verification import CompetitorMap, add_competitor_facts, map_competitors, verify_targets
 from app.models import (
     Axis,
     Committee,
@@ -167,13 +169,19 @@ def _llm_payload(profile: StartupProfile, bundle: EvidenceBundle) -> dict[str, A
 async def run_analysis(settings: Settings, profile: StartupProfile) -> AsyncIterator[dict[str, Any]]:
     run_id = f"run-{uuid.uuid4().hex[:10]}"
     analyst = {"openai": "OpenAI", "gemini": "Gemini"}.get(settings.analysis_mode, "Demo")
+    live_graph = settings.data_mode == "cala"
     yield {"type": "start", "runId": run_id, "question": profile.question,
            "dataMode": settings.data_mode, "analysisMode": settings.analysis_mode}
     steps = [{"id": f"cala:{kind}", "group": "Cala data", "label": label} for kind, label in QUERY_LABELS.items()]
+    if live_graph:
+        steps.append({"id": "graph:competitors", "group": "Cala graph", "label": "Who backs your competitors"})
     steps += [
         {"id": "scenarios", "group": analyst, "label": "Drivers, scenario matrix and round probability"},
         {"id": "committee", "group": analyst, "label": "Investment committee and investor shortlist"},
     ]
+    if live_graph:
+        steps.append({"id": "graph:investors", "group": "Cala graph",
+                      "label": "Verify shortlist: portfolio, recent deals, conflicts"})
     yield {"type": "steps", "steps": steps}
     for kind in QUERY_LABELS:
         yield {"type": "step", "id": f"cala:{kind}", "state": "running"}
@@ -188,8 +196,7 @@ async def run_analysis(settings: Settings, profile: StartupProfile) -> AsyncIter
                "detail": detail, "seconds": item["seconds"]}
         yield {"type": "evidence", "mode": "demo" if settings.data_mode == "demo" else "cala",
                "errors": [], "evidence": [e.model_dump() for e in item["evidence"]]}
-    yield {"type": "evidence", "mode": bundle.mode, "errors": bundle.errors,
-           "evidence": [e.model_dump() for e in bundle.evidence]}
+    yield _evidence_event(bundle)
     if not bundle.evidence:
         yield {"type": "error", "message": "Cala returned no usable evidence for this startup. Try a broader sector or region."}
         return
@@ -203,22 +210,46 @@ async def run_analysis(settings: Settings, profile: StartupProfile) -> AsyncIter
     valid = {e.id for e in bundle.evidence}
     payload = _llm_payload(profile, bundle)
 
+    # The competitor graph lookup runs while the analyst builds scenarios.
+    cmap = CompetitorMap()
+    graph_task = None
+    if live_graph:
+        yield {"type": "step", "id": "graph:competitors", "state": "running", "detail": "following INVESTED_IN edges"}
+        graph_started = time.monotonic()
+        graph_task = asyncio.create_task(map_competitors(settings, bundle, profile))
+
     yield {"type": "step", "id": "scenarios", "state": "running", "detail": f"reading {len(bundle.evidence)} facts"}
     started = time.monotonic()
-    raw_plan = (
-        await structured_call(settings, PLAN_PROMPT, payload, "scenario_plan", PLAN_SCHEMA)
-        if settings.analysis_mode != "demo"
-        else demo_plan(profile)
-    )
+    try:
+        raw_plan = (
+            await structured_call(settings, PLAN_PROMPT, payload, "scenario_plan", PLAN_SCHEMA)
+            if settings.analysis_mode != "demo"
+            else demo_plan(profile)
+        )
+    except BaseException:
+        if graph_task:
+            graph_task.cancel()
+        raise
     plan = normalize_plan(raw_plan, valid, profile.question)
     yield {"type": "step", "id": "scenarios", "state": "done", "seconds": round(time.monotonic() - started, 1),
            "detail": f"{len(plan.drivers)} drivers, 4 scenarios"}
     yield {"type": "plan", "plan": plan.model_dump()}
 
+    if graph_task:
+        cmap = await graph_task
+        add_competitor_facts(bundle, cmap)
+        linked = sum(1 for c in cmap.competitors if cmap.backers.get(c.id))
+        yield {"type": "step", "id": "graph:competitors", "state": "done",
+               "seconds": round(time.monotonic() - graph_started, 1),
+               "detail": f"{linked} of {len(cmap.competitors)} competitors with known backers"}
+        yield {"type": "graph", "competitors": cmap.as_payload()}
+        yield _evidence_event(bundle)
+
     yield {"type": "step", "id": "committee", "state": "running", "detail": "three partners debating"}
     started = time.monotonic()
-    committee_payload = {**payload, "scenarios": [s.model_dump() for s in plan.scenarios],
-                         "roundProbability": plan.event.probability}
+    committee_payload = {**_llm_payload(profile, bundle), "scenarios": [s.model_dump() for s in plan.scenarios],
+                         "roundProbability": plan.event.probability,
+                         "competitorBackersFromCalaGraph": cmap.as_payload()}
     raw_committee = (
         await structured_call(settings, COMMITTEE_PROMPT, committee_payload, "committee", COMMITTEE_SCHEMA)
         if settings.analysis_mode != "demo"
@@ -228,4 +259,23 @@ async def run_analysis(settings: Settings, profile: StartupProfile) -> AsyncIter
     yield {"type": "step", "id": "committee", "state": "done", "seconds": round(time.monotonic() - started, 1),
            "detail": f"{len(committee.investorTargets)} investors shortlisted"}
     yield {"type": "committee", "committee": committee.model_dump()}
+
+    if live_graph:
+        yield {"type": "step", "id": "graph:investors", "state": "running",
+               "detail": f"checking {len(committee.investorTargets)} investors"}
+        started = time.monotonic()
+        targets = await verify_targets(settings, committee.investorTargets, cmap, bundle)
+        committee = committee.model_copy(update={"investorTargets": targets})
+        verified = sum(1 for t in targets if t.verification and t.verification.verified)
+        conflicted = sum(1 for t in targets if t.verification and t.verification.conflicts)
+        yield {"type": "step", "id": "graph:investors", "state": "done",
+               "seconds": round(time.monotonic() - started, 1),
+               "detail": f"{verified} verified, {conflicted} with conflicts"}
+        yield _evidence_event(bundle)
+        yield {"type": "committee", "committee": committee.model_dump()}
     yield {"type": "done", "runId": run_id}
+
+
+def _evidence_event(bundle: EvidenceBundle) -> dict[str, Any]:
+    return {"type": "evidence", "mode": bundle.mode, "errors": bundle.errors,
+            "evidence": [e.model_dump() for e in bundle.evidence]}

@@ -10,6 +10,26 @@ Sourced fundraising foresight for first-time founders. Describe your startup and
 
 Every claim in the UI has clickable evidence chips that jump to the source fact.
 
+## How Cala is used
+
+| Cala feature | Endpoint | What it gives the founder |
+|---|---|---|
+| Natural-language answers with sourced context | `POST /v1/knowledge/search` | Competitors, recent rounds and active lead investors; every fact keeps its source documents |
+| Structured query (Cala QL) | `POST /v1/knowledge/query` | Top-funded companies in the sector with rounds and investors |
+| Entity mentions | `entities` in search answers | Exact graph ids for the competitors Cala found |
+| Entity search + introspection | `GET /v1/entities`, `GET /v1/entities/{id}/introspection` | Resolve each shortlisted investor to its graph entity and check which relationships exist |
+| Graph traversal | `POST /v1/entities/{id}` | `INVESTED_IN` edges into competitors (who backs them), each investor's portfolio, and `PARTICIPATES_IN_FUNDING_ROUND` → round `announcement_date` to prove they are still active |
+
+From this the app flags **conflicts of interest** (an investor that backs a direct competitor, from the graph or sourced text), marks each lead **Verified in Cala graph** with portfolio size and latest deal date, and ranks conflict-free, verified leads first.
+
+## Example replays
+
+The three examples on the landing page replay real recorded runs (Cala + LLM), compressed to about 9 seconds, so demos are reliable. Editing any field runs the live pipeline. Re-record with:
+
+```bash
+cd backend && set -a && . ../.env && set +a && .venv/bin/python -m scripts.record_examples
+```
+
 ## Where it comes from
 
 - **ORACLE** (Metropolia foresight platform): drivers, PESTEL tagging, scenario matrix workflow and multi-agent debate. Ideas are reimplemented here; no ORACLE code is copied.

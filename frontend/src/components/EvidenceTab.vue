@@ -25,7 +25,7 @@ const shown = computed(() => {
       <input v-model="query" type="search" class="search" placeholder="Search facts" aria-label="Search facts" />
     </header>
     <div class="filters">
-      <button v-for="k in ['all', 'competitor', 'funding', 'investor', 'market']" :key="k" type="button"
+      <button v-for="k in ['all', 'competitor', 'funding', 'investor', 'market', 'graph']" :key="k" type="button"
         :class="['chip', { on: kind === k }]" :disabled="!counts[k]" @click="kind = k">
         {{ k === "all" ? "All" : KIND_LABELS[k] }} <small>{{ counts[k] || 0 }}</small>
       </button>
