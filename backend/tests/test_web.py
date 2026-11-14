@@ -74,3 +74,11 @@ def test_deal_dashboard_sentences_count_only_on_pages_about_the_investor():
     page = "# 2C Ventures\n4 venture rounds in the first 9 months of 2026, at 4 companies in 2 countries.\nRounds in 2025"
     assert deal_sentences(page, "2C Ventures", [], about_page=True).startswith("4 venture rounds")
     assert deal_sentences(page, "2C Ventures", [], about_page=False) == ""
+
+
+def test_own_site_detection():
+    from app.web import _own_site
+    assert _own_site("Greencode Ventures", "greencode.vc")
+    assert _own_site("Lifeline Ventures", "lifelineventures.com")
+    assert not _own_site("Lifeline Ventures", "badideas.fund")
+    assert not _own_site("2C Ventures", "funding.tech.eu")

@@ -6,7 +6,15 @@ Will your round close, and who should you pitch first? Unicorn Oracle answers bo
 
 ![Report overview: who to pitch first, verified in the Cala graph](docs/screenshots/overview.png)
 
-**Junction 2026 challenges:** main challenge **Make Unicorns Real** by Cala (FinTech track); tech challenge **Best Use of Gemini API** by Google DeepMind (Gemini runs the AI investment committee, drivers and scenarios).
+**Junction 2026 challenges:**
+
+| | Challenge | How the product uses it |
+|---|---|---|
+| Main (FinTech track) | **Make Unicorns Real** by Cala | Cala search, Cala QL and the knowledge graph are the core of every report |
+| Tech | **Best Use of Gemini API** by Google DeepMind | Gemini runs the AI investment committee, drivers and scenarios |
+| Tech | **Best Use of Context.dev: Fully Structured Web** | Competitor funding and headcount, investor websites, logos, stated focus and competitor news |
+| Tech | **Best agentic use case of Oxylabs Web API** | Live search-to-scrape for each investor's latest deals, quoted with the source URL |
+| Tech | **Best Use of Nemotron** by NVIDIA | Nemotron 3.5 Super VL independently audits Gemini's shortlist and demotes contradicted leads |
 
 ## Judge it in 30 seconds
 
@@ -53,7 +61,24 @@ From this the app:
 - draws your market as a graph: you → competitors → their backers, with shortlisted leads highlighted;
 - ranks conflict-free, verified, right-sized leads first.
 
-Every report ends with a usage line ("N knowledge searches · N structured queries · N entity lookups · N graph relationships"), counted per run.
+Every report ends with a usage line ("N knowledge searches · N structured queries · N entity lookups · N graph relationships"), counted per run, plus a second line for the live-web and Nemotron calls.
+
+## Live web and a second model (tech challenges)
+
+Cala gives the sourced history. Three more services check that it is still true today, and every fact they add gets an evidence id and a source link like the Cala facts. Each service switches on with its key and is skipped without it; a failed call is reported on the progress panel and never stops the report.
+
+| Service | Calls | What it adds |
+|---|---|---|
+| **Context.dev** (4 endpoints combined) | `POST /v1/company/search`, `POST /v1/brand/retrieve`, `POST /v1/web/scrape`, `POST /v1/news/search` | Competitors: total funding, latest round, stage, headcount, founding year and the latest headline. Investors: website, logo and their investment focus in their own words, scraped from their site. |
+| **Oxylabs Web API** (search → scrape) | `POST /v1/search`, then `POST /v1/scrape` (markdown) | For each shortlisted investor: searches for third-party coverage of recent deals, skips the investor's own site, reads the best page and quotes only sentences with a date or an amount, with the source URL. |
+| **NVIDIA Nemotron** (`nvidia/nemotron-3.5-super-vl-120b-a12b`) | NVIDIA Build, OpenAI-compatible chat completions with a JSON schema | An independent auditor from a different model family. It reads all evidence plus a deterministic citation check (do the facts Gemini cited actually name this investor?) and rates each lead supported, weak or contradicted. Contradicted leads drop to the bottom: a feedback loop on the first model. |
+
+What the audit has caught in recorded runs:
+
+- Gemini claimed Lifeline Ventures does not back the drone competitor Kelluu; Nemotron marked it **contradicted** because the Cala graph shows that investment.
+- Gemini shortlisted Business Finland for an equity seed round; Nemotron marked it **weak**: a public funder giving non-dilutive grants cannot lead an equity round.
+
+Nemotron runs with reasoning off by default: on a 60-fact report it answers in about 3 seconds instead of about 55, with a similarly specific audit. Set `NEMOTRON_REASONING=on` to switch it back on.
 
 ## Limitations
 
@@ -61,6 +86,8 @@ Every report ends with a usage line ("N knowledge searches · N structured queri
 - Round sizes are the total size of rounds the investor joined, not its own cheque. USD is converted at a fixed 0.92.
 - Graph coverage varies. Some investors have no round data; their cards then show no round-size line.
 - The round probability is a structured judgement from sourced evidence, not a statistical model trained on outcomes.
+- Live-web quotes come from whatever page ranks best. Deal tables are quoted as their raw rows, and some sources are aggregators rather than press releases; every quote links to its page so it can be checked.
+- The Nemotron audit is a second opinion, not ground truth. Its verdict and reason are shown next to Gemini's, and the cited facts are one click away.
 
 ## Example replays
 

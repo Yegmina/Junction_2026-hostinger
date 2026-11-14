@@ -276,6 +276,13 @@ async def oxy_scrape(http: httpx.AsyncClient, key: str, url: str) -> str:
 SKIP_DOMAINS = ("linkedin.com", "facebook.com", "x.com", "twitter.com", "instagram.com", "youtube.com")
 
 
+def _own_site(name: str, domain: str) -> bool:
+    """'Greencode Ventures' owns greencode.vc and greencodeventures.com, not funding.tech.eu."""
+    host = _norm(domain.split(".")[0] if domain.count(".") <= 1 else domain.rsplit(".", 2)[-2])
+    first = _norm(name.split()[0]) if name.split() else ""
+    return bool(host) and (host in _norm(name) or (len(first) >= 5 and host.startswith(first)))
+
+
 def _outline(result: dict[str, Any]) -> str:
     outline = result.get("outline")
     if isinstance(outline, list):
@@ -288,12 +295,11 @@ async def investor_news(http: httpx.AsyncClient, key: str, investor: str, profil
     """Oxylabs search-to-scrape: find third-party coverage of the investor's recent deals, read the page,
     quote the sentences that name it. The investor's own site is skipped (Context.dev covers it)."""
     short = _short_name(investor)
-    own = _norm(short)
     query = f"\"{short}\" led {profile.stage.replace('-', ' ')} round {date.today().year}"
     results = await oxy_search(http, key, query, max_results=8)
     candidates = [r for r in results
                   if short.lower() in f"{r.get('title', '')} {_outline(r)}".lower()
-                  and own not in _norm(domain_of(r["url"]))
+                  and not _own_site(short, domain_of(r["url"]))
                   and not any(d in domain_of(r["url"]) for d in SKIP_DOMAINS)]
     for result in candidates[:2]:
         page = ""
