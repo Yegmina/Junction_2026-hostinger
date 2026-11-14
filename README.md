@@ -1,6 +1,6 @@
 # Unicorn Oracle: Make Unicorns Real (Junction 2026, Cala challenge)
 
-**Live demo: https://93-127-213-190.sslip.io** · sample report: https://93-127-213-190.sslip.io/r/run-14f6288823
+**Live demo: https://93-127-213-190.sslip.io** · sample report: https://93-127-213-190.sslip.io/r/run-14f6288823 · pitch deck: https://93-127-213-190.sslip.io/pitch/
 
 Will your round close, and who should you pitch first? Unicorn Oracle answers both for first-time founders, using live Cala data: sourced evidence, the Cala knowledge graph and an AI investment committee. Every claim links to its source.
 

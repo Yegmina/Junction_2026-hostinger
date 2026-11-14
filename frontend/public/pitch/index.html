@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Unicorn Oracle pitch</title>
+<meta name="description" content="Unicorn Oracle: fundraising foresight on Cala data. Junction 2026, Cala challenge.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&family=Inter:wght@400;600&display=swap">
+<style>
+* { margin:0 }
+html,body { height:100%; background:#0D0E1A; overflow:hidden; }
+#stage { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
+#deck { width:1920px; height:1080px; position:relative; flex-shrink:0; }
+#deck > section { position:absolute; inset:0; width:1920px; height:1080px; overflow:hidden; display:none !important; }
+#deck > section.on { display:flex !important; }
+#deck aside { display:none; }
+x-shape { display:block; }
+x-shape[kind="arrow-right"] { clip-path: polygon(0 30%, 60% 30%, 60% 0, 100% 50%, 60% 100%, 60% 70%, 0 70%); height:28px !important; width:44px !important; }
+table { width:100%; border-collapse:collapse; }
+th,td { padding:.35em .6em; text-align:left; border-bottom:2px solid #DEDBEE; }
+th { font-weight:600; }
+#ui { position:fixed; right:16px; bottom:12px; display:flex; gap:8px; align-items:center; font:14px Inter,Arial,sans-serif; color:#B8B6D3; z-index:9; }
+#ui button { background:#25273F; color:#ECEBF7; border:0; border-radius:8px; padding:8px 12px; font:inherit; cursor:pointer; }
+#ui button:hover { background:#5B3DF5; }
+</style>
+<style>section {
+  --ink: #15172B;
+  --paper: #F6F5FB;
+  --paper-2: #ECEAF6;
+  --card: #FDFCFF;
+  --line: #DEDBEE;
+  --soft: #4A4F66;
+  --violet: #5B3DF5;
+  --violet-light: #A99BFF;
+  --teal: #00756F;
+  --red: #B42F25;
+  --on-dark: #ECEBF7;
+  --on-dark-soft: #B8B6D3;
+  box-sizing: border-box;
+  padding: 128px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Inter', Arial, sans-serif;
+  font-size: 32px;
+  counter-increment: page;
+}
+section.alt { background: var(--paper-2); }
+section.dark { background: var(--ink); color: var(--on-dark); }
+section.violet { background: var(--violet); color: #FBFAFF; }
+section.footed { padding: 128px 128px 160px; }
+
+h1, h2, h3 { font-family: 'Space Grotesk', Arial, sans-serif; font-weight: 700; color: inherit; }
+h1 { font-size: 120px; line-height: 1.0; }
+h2 { font-size: 72px; line-height: 1.05; }
+h3 { font-size: 44px; line-height: 1.1; font-weight: 600; }
+
+.eyebrow { font-size: 24px; font-weight: 600; letter-spacing: 3px; color: var(--violet); }
+.dark .eyebrow { color: var(--violet-light); }
+.violet .eyebrow { color: #E4DEFF; }
+.lede { font-size: 32px; line-height: 1.4; color: var(--soft); }
+.dark .lede { color: var(--on-dark-soft); }
+.small { font-size: 24px; line-height: 1.4; color: var(--soft); }
+.dark .small { color: var(--on-dark-soft); }
+.head { display: flex; flex-direction: column; gap: 16px; }
+
+.cards { display: flex; gap: 32px; }
+.card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 40px;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 24px;
+}
+.card .body { font-size: 32px; line-height: 1.4; color: var(--soft); }
+.card .tag { font-size: 24px; font-weight: 600; color: var(--violet); }
+
+.shot { border: 2px solid var(--line); border-radius: 20px; object-fit: contain; background: #FFFFFF; }
+
+.footer {
+  position: absolute;
+  left: 128px;
+  bottom: 64px;
+  width: 1664px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 24px;
+  color: var(--soft);
+}
+.dark .footer { color: var(--on-dark-soft); }
+
+.rise { animation: rise 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 110ms); }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade { animation: fade 700ms ease-out both; animation-delay: calc(var(--i, 0) * 110ms); }
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Flow slide */
+.flow { display: flex; align-items: center; gap: 24px; }
+.flow .stage, .flow .step, .flow .arrow, .flow .lane-label { box-sizing: border-box; flex-shrink: 0; }
+.flow .stage { display: flex; flex-direction: column; gap: 12px; padding: 32px; background: var(--card); border: 2px solid var(--line); border-radius: 20px; }
+.flow .stage .body { font-size: 26px; line-height: 1.35; color: var(--soft); }
+.flow .stage .time { font-size: 24px; font-weight: 600; color: var(--teal); }
+.flow .lanes { display: flex; flex-direction: column; gap: 24px; }
+.flow .lane { display: flex; align-items: center; gap: 16px; }
+.flow .lane-label { width: 150px; font-size: 24px; font-weight: 600; color: var(--violet); }
+.flow .step { width: 220px; padding: 20px 24px; background: var(--card); border: 2px solid var(--line); border-radius: 16px; }
+.flow .step p { font-size: 26px; line-height: 1.3; }
+.flow .step .time { color: var(--teal); font-weight: 600; }
+.flow .arrow { width: 36px; height: 18px; background: var(--violet-light); }
+.flow .report { background: var(--ink); color: var(--on-dark); border-color: var(--ink); }
+.flow .report .body { color: var(--on-dark-soft); }
+.flow .report .time { color: #6FE0D6; }
+
+/* Numbers slide */
+.stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 56px 48px; }
+.stat { display: flex; flex-direction: column; gap: 8px; }
+.stat .big { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 120px; font-weight: 700; line-height: 1.0; color: #FBFAFF; }
+.stat .label { font-size: 28px; line-height: 1.35; color: #E4DEFF; }
+.verdict { font-size: 32px; line-height: 1.4; color: #FBFAFF; padding: 24px 32px; border: 2px solid #8D78FF; border-radius: 20px; }
+
+/* Table slide */
+.cala-table { font-size: 26px; color: var(--ink); }
+
+/* Lists */
+.points { font-size: 32px; line-height: 1.45; color: var(--ink); padding-left: 40px; }
+.dark .points { color: var(--on-dark); }
+
+/* Checks row */
+.checks { display: flex; gap: 24px; }
+.check { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 36px; background: var(--card); border: 2px solid var(--line); border-radius: 20px; }
+.check .title { font-size: 36px; font-weight: 600; color: var(--ink); }
+.check .body { font-size: 28px; line-height: 1.35; color: var(--soft); }
+.check.warn .title { color: var(--red); }
+.check.ok .title { color: var(--teal); }
+
+.url { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 56px; font-weight: 600; color: var(--violet-light); }
+</style>
+</head><body>
+<div id="stage"><div id="deck">
+<section id="cover" class="dark footed" data-transition="fade">
+<svg aria-label="Decorative network of startup, competitor and investor nodes" width="720" height="720" viewBox="0 0 720 720" style="position:absolute; left:1100px; top:180px; width:720px; height:720px; opacity:0.9;">
+<g fill="none" stroke-width="3">
+<path d="M150 360 C300 360 300 170 430 170" stroke="#4B4F75" stroke-dasharray="10 10"/>
+<path d="M150 360 C300 360 300 360 430 360" stroke="#4B4F75" stroke-dasharray="10 10"/>
+<path d="M150 360 C300 360 300 550 430 550" stroke="#4B4F75" stroke-dasharray="10 10"/>
+<path d="M430 170 C530 170 530 90 630 90" stroke="#3A3E63"/>
+<path d="M430 170 C530 170 530 230 630 230" stroke="#3A3E63"/>
+<path d="M430 360 C530 360 530 230 630 230" stroke="#3A3E63"/>
+<path d="M430 360 C530 360 530 370 630 370" stroke="#E0665C"/>
+<path d="M430 550 C530 550 530 500 630 500" stroke="#3A3E63"/>
+<path d="M150 360 C260 700 520 640 630 630" stroke="#3FCFB0" stroke-dasharray="14 10"/>
+</g>
+<circle cx="150" cy="360" r="56" fill="#5B3DF5"/>
+<circle cx="430" cy="170" r="16" fill="#15172B" stroke="#B8B6D3" stroke-width="4"/>
+<circle cx="430" cy="360" r="16" fill="#15172B" stroke="#B8B6D3" stroke-width="4"/>
+<circle cx="430" cy="550" r="16" fill="#15172B" stroke="#B8B6D3" stroke-width="4"/>
+<circle cx="630" cy="90" r="12" fill="#2A2D4A" stroke="#8B8FB0" stroke-width="3"/>
+<circle cx="630" cy="230" r="12" fill="#2A2D4A" stroke="#8B8FB0" stroke-width="3"/>
+<circle cx="630" cy="370" r="14" fill="#E0665C"/>
+<circle cx="630" cy="500" r="12" fill="#2A2D4A" stroke="#8B8FB0" stroke-width="3"/>
+<circle cx="630" cy="630" r="16" fill="#3FCFB0"/>
+</svg>
+<div class="head rise" style="width:1000px; margin-top:120px; --i:0;">
+<p class="eyebrow">JUNCTION 2026 · CALA CHALLENGE: MAKE UNICORNS REAL</p>
+<h1>Unicorn Oracle</h1>
+<p class="lede" style="font-size:40px;">Will your round close, and who should you pitch first? Sourced answers from Cala’s live data and knowledge graph.</p>
+</div>
+<div class="footer"><p>93-127-213-190.sslip.io</p><p>Fundraising foresight for first-time founders</p></div>
+<aside>Hi, we built Unicorn Oracle for the Cala challenge. A founder describes their startup and the round they want to raise. In about a minute they get two answers: how likely the round is to close, and which investors to pitch first. Every claim is backed by Cala data. The picture on the right is the idea in one image: you, your competitors, and the investors behind them.</aside>
+</section>
+<section id="problem">
+<div class="head">
+<p class="eyebrow">THE PROBLEM</p>
+<h2>First-time founders pitch blind</h2>
+</div>
+<p class="lede" style="width:1300px; font-size:36px;">Before the first meeting, three questions decide whether a pitch is worth the time. Today each takes days of manual digging.</p>
+<div class="cards" style="margin-top:40px;">
+<div class="card rise" style="--i:0;">
+<p class="tag">CONFLICTS</p>
+<h3>Who backs my competitors?</h3>
+<p class="body">Pitching a rival’s investor wastes a meeting and can put your plan in a competitor’s board pack.</p>
+</div>
+<div class="card rise" style="--i:1;">
+<p class="tag">FIT</p>
+<h3>Who still leads rounds my size?</h3>
+<p class="body">Static investor lists don’t show who is active now, at your stage and ticket size.</p>
+</div>
+<div class="card rise" style="--i:2;">
+<p class="tag">ACCESS</p>
+<h3>Who can introduce me?</h3>
+<p class="body">Warm intros beat cold email, but finding the right person means mapping whole portfolios by hand.</p>
+</div>
+</div>
+<aside>Picture a founder about to raise a 2.5 million euro seed round. They have a list of investors, but they don’t know which ones already back a competitor, which ones are still leading rounds this size, or who could introduce them. Each of those questions usually takes days of research. That is what we automate.</aside>
+</section>
+<section id="answer" class="alt">
+<div style="display:flex; gap:64px; align-items:center; flex:1;">
+<div class="head" style="width:600px; gap:32px;">
+<p class="eyebrow">THE ANSWER</p>
+<h2>One form in, one sourced report out</h2>
+<ul class="points" style="font-size:30px;">
+<li>Chance your round closes, with a range across four futures</li>
+<li>Who to pitch first, each lead verified in Cala’s graph</li>
+<li>Every claim links to its Cala source</li>
+</ul>
+</div>
+<img class="shot fade" src="overview.png" alt="Unicorn Oracle report for Ledgerly: who to pitch first, with three verified investors, round-size fit and warm intros" style="width:1000px; height:672px;">
+</div>
+<aside>The founder fills in one short form: what they build, sector, country, stage, amount and timeline. Out comes one report. At the top is who to pitch first. Each lead is verified in Cala’s knowledge graph, checked against the round size, and comes with a warm intro path. Behind it is the full forecast and every source.</aside>
+</section>
+<section id="flow">
+<div class="head">
+<p class="eyebrow">HOW A RUN WORKS</p>
+<h2>Two lanes in parallel, one report</h2>
+</div>
+<div class="flow" style="flex:1;">
+<div class="stage rise" style="width:300px; --i:0;">
+<h3 style="font-size:36px;">Cala evidence</h3>
+<p class="body">3 knowledge searches + 1 Cala QL query, in parallel</p>
+<p class="time">50 sourced facts</p>
+</div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="lanes">
+<div class="lane rise" style="--i:1;">
+<p class="lane-label">Shortlist</p>
+<div class="step"><p><b>Competitor graph</b><br>who backs them<br><span class="time">11 s</span></p></div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="step"><p><b>AI committee</b><br>3 partners debate<br><span class="time">30 s</span></p></div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="step"><p><b>Graph check</b><br>rounds, intros, conflicts<br><span class="time">5 s</span></p></div>
+</div>
+<div class="lane rise" style="--i:2;">
+<p class="lane-label">Forecast</p>
+<div class="step" style="width:796px;"><p><b>Drivers → 2×2 scenario matrix → chance to close</b><br>P(round) = Σ P(scenario) × P(round | scenario)<br><span class="time">52 s</span></p></div>
+</div>
+</div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="stage report rise" style="width:230px; --i:3;">
+<h3 style="font-size:36px;">Report</h3>
+<p class="body">streams in live</p>
+<p class="time">53 s total</p>
+</div>
+</div>
+<p class="small">Timings from the recorded live run for Ledgerly (CSRD reporting SaaS, €2.5M seed). The shortlist is ready before the scenarios finish.</p>
+<aside>Here is a real run. First, four Cala calls run in parallel and return 50 sourced facts. Then two lanes start at once. The shortlist lane maps who backs the competitors in Cala’s graph, has three AI partners debate, and checks each lead in the graph again. The forecast lane builds drivers, a 2-by-2 scenario matrix and the chance to close. Everything streams to the screen as it happens, so the founder sees who to pitch first after about 46 seconds.</aside>
+</section>
+<section id="cala" class="alt">
+<div class="head">
+<p class="eyebrow">HOW IT USES CALA</p>
+<h2>Search, query, then walk the graph</h2>
+</div>
+<table class="cala-table fade" style="font-size:34px;">
+<tr><th style="width:24%;">Cala feature</th><th style="width:34%;">Call</th><th style="width:42%;">What the founder gets</th></tr>
+<tr><td>Knowledge search</td><td>POST /v1/knowledge/search</td><td>Competitors, rounds, lead investors, sourced</td></tr>
+<tr><td>Cala QL query</td><td>POST /v1/knowledge/query</td><td>Top-funded sector companies and investors</td></tr>
+<tr><td>Entity resolution</td><td>GET /v1/entities + introspection</td><td>Each investor matched to a real entity</td></tr>
+<tr><td>Graph traversal</td><td>POST /v1/entities/{id}</td><td>Portfolios, competitor backers, round sizes</td></tr>
+<tr><td>People edges</td><td>FOUNDED, IS_CEO_OF, IS_CTO_OF</td><td>Portfolio founders as warm intro paths</td></tr>
+</table>
+<p class="lede" style="margin-top:24px; font-size:34px;">Every report prints its own usage line. Ledgerly’s: <b>3 knowledge searches · 1 structured query · 83 entity lookups · 255 graph relationships.</b></p>
+<aside>Cala is not a side feature here, it is the backbone. Search and Cala QL give sourced facts. Then we walk the knowledge graph: we resolve each investor to a real entity, read its portfolio and its funding rounds, find who backs each competitor, and follow FOUNDED and CEO edges to find people who can make an intro. Every report counts and shows exactly how many Cala calls it used.</aside>
+</section>
+<section id="checks">
+<div class="head">
+<p class="eyebrow">GRAPH CHECKS</p>
+<h2>Every lead is checked four ways</h2>
+</div>
+<div class="checks">
+<div class="check ok rise" style="--i:0;"><p class="title">Verified</p><p class="body">Real entity in Cala’s graph, with recent deals and latest deal date</p></div>
+<div class="check ok rise" style="--i:1;"><p class="title">Right size</p><p class="body">Stages and round sizes it joined, compared with your raise</p></div>
+<div class="check ok rise" style="--i:2;"><p class="title">Warm intro</p><p class="body">Founders and CEOs of companies it already funded</p></div>
+<div class="check warn rise" style="--i:3;"><p class="title">Conflict</p><p class="body">An INVESTED_IN edge into one of your competitors</p></div>
+</div>
+<img class="shot fade" src="investor-card.png" alt="Investor card for Lifeline Ventures: verified in Cala graph, 6 deals in the last 2 years, joined pre-seed to Series A rounds of €500k to €92M which fits a €2.5M seed, warm intros via three portfolio founders" style="width:1664px; height:344px; --i:4;">
+<aside>Each shortlisted investor goes through four checks in the graph. Is it a real, active investor? Do the rounds it joins fit this raise? Who in its portfolio could introduce you? And does it already back a competitor? Here is Lifeline Ventures for our CSRD example: verified, six deals in two years, rounds that fit a 2.5 million seed, and three founders from its portfolio who could make the intro. One click drafts the intro email.</aside>
+</section>
+<section id="market" class="alt">
+<div style="display:flex; gap:64px; align-items:center; flex:1;">
+<div class="head" style="width:580px; gap:32px;">
+<p class="eyebrow">YOUR MARKET</p>
+<h2>See the conflict before you pitch</h2>
+<p class="lede">Your startup, the competitors Cala found, and their backers from INVESTED_IN edges.</p>
+<p class="lede"><span style="color:#B42F25;"><b>Red:</b></span> Superhero Capital was shortlisted, but backs the competitor Emabler, so it drops to last.</p>
+<p class="lede"><span style="color:#00756F;"><b>Green:</b></span> clean leads with no competitor stake.</p>
+</div>
+<img class="shot fade" src="market-graph.png" alt="Market graph: Ledgerly linked to competitors Kausal, Upright, Capalo AI, Emabler and Cooler Future; their backers on the right; Superhero Capital in red backing Emabler; Lifeline, 2C and Voima Ventures in green as clean leads" style="width:1020px; height:758px;">
+</div>
+<aside>This is the market map from the same run. On the left is Ledgerly, in the middle the competitors Cala found, on the right the investors behind them. The committee liked Superhero Capital, but the graph shows it backs Emabler, a competitor. So it is flagged in red and ranked last. The green ones are clean leads.</aside>
+</section>
+<section id="numbers" class="violet">
+<div class="head">
+<p class="eyebrow">ONE REAL RUN · LEDGERLY, CSRD REPORTING SAAS, €2.5M SEED</p>
+<h2>53 seconds from form to shortlist</h2>
+</div>
+<div class="stats">
+<div class="stat rise" style="--i:0;"><p class="big">50</p><p class="label">sourced facts from 12 sources</p></div>
+<div class="stat rise" style="--i:1;"><p class="big">255</p><p class="label">graph relationships read, 83 entity lookups</p></div>
+<div class="stat rise" style="--i:2;"><p class="big">4/4</p><p class="label">shortlisted leads verified in Cala’s graph</p></div>
+<div class="stat rise" style="--i:3;"><p class="big">8</p><p class="label">warm intro paths through portfolio founders</p></div>
+<div class="stat rise" style="--i:4;"><p class="big">1</p><p class="label">conflict caught: Superhero Capital backs rival Emabler</p></div>
+<div class="stat rise" style="--i:5;"><p class="big">21%</p><p class="label">chance to close in 12 months (range 3–39%)</p></div>
+</div>
+<aside>These numbers come from one recorded live run, not a mock-up. 53 seconds end to end. 50 sourced facts, 255 graph relationships read. All four shortlisted investors verified, eight warm intro paths, and one conflict the AI committee alone would have missed. The forecast is honest too: 21 percent, because the main competitor is well funded. That tells the founder what to fix before pitching.</aside>
+</section>
+<section id="trust">
+<div class="head">
+<p class="eyebrow">BUILT TO BE TRUSTED</p>
+<h2>No invented names, no dead demos</h2>
+</div>
+<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:40px; margin-top:24px;">
+<div class="card rise" style="--i:0;"><h3 style="font-size:44px;">Real investors only</h3><p class="body">A lead is kept only if its name appears in Cala evidence.</p></div>
+<div class="card rise" style="--i:1;"><h3 style="font-size:44px;">Every claim cited</h3><p class="body">Evidence chips open the exact fact and its source.</p></div>
+<div class="card rise" style="--i:2;"><h3 style="font-size:44px;">Fast</h3><p class="body">Shortlist and forecast run in parallel; Cala answers cached for 24 h.</p></div>
+<div class="card rise" style="--i:3;"><h3 style="font-size:44px;">Reliable demo</h3><p class="body">Example chips replay real recorded runs in about 9 s.</p></div>
+<div class="card rise" style="--i:4;"><h3 style="font-size:44px;">Resilient</h3><p class="body">Gemini retries, then falls back to a smaller model.</p></div>
+<div class="card rise" style="--i:5;"><h3 style="font-size:44px;">Shareable</h3><p class="body">Report links, investor list export, intro email drafts.</p></div>
+</div>
+<aside>A few design choices make this trustworthy. The AI can’t invent investors: a name is dropped unless it appears in Cala’s evidence. Every claim links to its source. For the demo, example chips replay real recorded runs, so they never fail on stage, and any edited input runs the full live pipeline. It runs over HTTPS with shareable report links.</aside>
+</section>
+<section id="limits" class="alt">
+<div class="head">
+<p class="eyebrow">LIMITATIONS</p>
+<h2>What it does not claim</h2>
+</div>
+<ul class="points" style="width:1560px; font-size:38px; display:flex; flex-direction:column; gap:40px; margin-top:24px;">
+<li>A warm intro is a graph link: the person founded or runs a company this investor funded. It does not mean they know you.</li>
+<li>Round sizes are whole rounds the investor joined, not its own cheque. USD is converted at a fixed rate.</li>
+<li>Graph coverage varies: some investors have no round data, so no round-size line is shown.</li>
+<li>The chance to close is a structured judgement from sourced evidence, not a model trained on outcomes.</li>
+</ul>
+<aside>We want to be upfront about the limits. Intro paths are links in the graph, not friendships. Round sizes are total rounds, not the investor’s own cheque. Coverage depends on Cala’s graph. And the probability is a structured, evidence-based judgement, not a trained predictor. With outcome data, that last one is the natural next step.</aside>
+</section>
+<section id="close" class="dark">
+<div class="head" style="margin-top:80px; gap:32px;">
+<p class="eyebrow">TRY IT NOW</p>
+<h1>Know who to pitch before you pitch.</h1>
+</div>
+<div style="display:flex; flex-direction:column; gap:20px; margin-top:24px;">
+<p class="url"><a href="https://93-127-213-190.sslip.io" style="color:inherit">93-127-213-190.sslip.io</a></p>
+<p class="lede">Sample report: <a href="https://93-127-213-190.sslip.io/r/run-14f6288823" style="color:inherit">93-127-213-190.sslip.io/r/run-14f6288823</a></p>
+<p class="lede">Code: <a href="https://github.com/Yegmina/Junction_2026-hostinger" style="color:inherit">github.com/Yegmina/Junction_2026-hostinger</a></p>
+</div>
+<aside>Try it yourself: click an example chip for a 9-second replay, or change any field for a fresh live run on Cala. Thank you.</aside>
+</section>
+</div></div>
+<div id="ui"><button id="prev" aria-label="Previous slide">‹</button><span id="num"></span><button id="next" aria-label="Next slide">›</button><button id="fs" aria-label="Full screen">⛶</button></div>
+<script>
+const S=[...document.querySelectorAll('#deck > section')],deck=document.getElementById('deck'),num=document.getElementById('num');
+let i=Math.min(Math.max((parseInt(location.hash.slice(1))||1)-1,0),S.length-1);
+function fit(){const k=Math.min(innerWidth/1920,innerHeight/1080);deck.style.transform='scale('+k+')';}
+function show(n){i=Math.min(Math.max(n,0),S.length-1);S.forEach(s=>s.classList.remove('on'));void deck.offsetWidth;S[i].classList.add('on');num.textContent=(i+1)+' / '+S.length;history.replaceState(null,'','#'+(i+1));}
+function toggleFs(){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();}
+addEventListener('resize',fit);
+addEventListener('keydown',e=>{if(['ArrowRight','PageDown',' ','Enter'].includes(e.key)){e.preventDefault();show(i+1)}else if(['ArrowLeft','PageUp','Backspace'].includes(e.key)){e.preventDefault();show(i-1)}else if(e.key==='Home')show(0);else if(e.key==='End')show(S.length-1);else if(e.key==='f')toggleFs();});
+document.getElementById('prev').onclick=()=>show(i-1);document.getElementById('next').onclick=()=>show(i+1);document.getElementById('fs').onclick=toggleFs;
+document.getElementById('stage').addEventListener('click',e=>{if(e.target.closest('a'))return;show(e.clientX>innerWidth/3?i+1:i-1);});
+let tx=null;addEventListener('touchstart',e=>tx=e.touches[0].clientX,{passive:true});addEventListener('touchend',e=>{if(tx===null)return;const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>40)show(d<0?i+1:i-1);tx=null;});
+fit();show(i);
+</script>
+</body></html>
