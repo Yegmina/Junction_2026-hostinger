@@ -86,7 +86,9 @@ async def _chat(settings: Settings, payload: dict[str, Any]) -> str:
             {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
         ],
         "temperature": 0.1,
-        "max_tokens": 4096,
+        "max_tokens": 16384 if settings.nemotron_reasoning else 4096,
+        # Measured on a 60-fact report: reasoning off answers in ~3 s, on in ~55 s with a similar audit.
+        "chat_template_kwargs": {"enable_thinking": settings.nemotron_reasoning},
     }
     headers = {"Authorization": f"Bearer {settings.nvidia_api_key}", "Accept": "application/json"}
     last: Exception | None = None
@@ -98,8 +100,10 @@ async def _chat(settings: Settings, payload: dict[str, Any]) -> str:
                 if response.status_code in (429, 500, 502, 503, 504):
                     raise httpx.HTTPStatusError("retryable", request=response.request, response=response)
                 response.raise_for_status()
-                message = response.json()["choices"][0]["message"]
-                return message.get("content") or ""
+                choice = response.json()["choices"][0]
+                if choice.get("finish_reason") == "length":
+                    raise ValueError("Nemotron ran out of tokens before answering")
+                return choice["message"].get("content") or ""
             except (httpx.HTTPStatusError, httpx.TransportError) as exc:
                 if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code not in (429, 500, 502, 503, 504):
                     raise

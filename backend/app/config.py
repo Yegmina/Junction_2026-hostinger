@@ -17,6 +17,7 @@ class Settings:
     oxylabs_api_key: str | None
     nvidia_api_key: str | None
     nemotron_model: str
+    nemotron_reasoning: bool
     access_code: str | None
     request_timeout_seconds: float
     rate_limit_per_hour: int
@@ -47,6 +48,7 @@ def get_settings() -> Settings:
         oxylabs_api_key=os.getenv("OXYLABS_WEB_API_KEY") or None,
         nvidia_api_key=os.getenv("NVIDIA_API_KEY") or None,
         nemotron_model=os.getenv("NEMOTRON_MODEL") or "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        nemotron_reasoning=(os.getenv("NEMOTRON_REASONING") or "").lower() in ("1", "true", "on", "yes"),
         access_code=os.getenv("ACCESS_CODE") or None,
         request_timeout_seconds=float(os.getenv("REQUEST_TIMEOUT_SECONDS") or 120),
         rate_limit_per_hour=int(os.getenv("RATE_LIMIT_PER_HOUR") or 30),

@@ -96,6 +96,10 @@ def domain_of(url: str | None) -> str:
     return host.removeprefix("www.")
 
 
+def _norm(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", text.lower())
+
+
 def _short_name(name: str) -> str:
     """'Lifeline Ventures Oy' -> 'Lifeline Ventures' for matching in web text."""
     return re.sub(r"\b(oy|ab|gmbh|ltd|llc|inc|as|a/s|bv|sa|plc)\b\.?$", "", name.strip(), flags=re.I).strip(" ,")
@@ -107,11 +111,26 @@ def _profile_words(profile: StartupProfile) -> list[str]:
 
 
 # ---------- Context.dev ----------
+# Four endpoints combined: company search (funding, headcount, domain), brand (logo),
+# web scrape (the investor's own words on its focus) and news (competitor headlines).
 
-async def brand_by_name(http: httpx.AsyncClient, key: str, name: str) -> dict[str, Any] | None:
-    data = await _post(http, f"{CONTEXT_DEV}/brand/retrieve", key, {"type": "by_name", "name": name}, "contextDev")
-    brand = data.get("brand") if isinstance(data, dict) else None
-    return brand if isinstance(brand, dict) and brand.get("domain") else None
+async def company_search(http: httpx.AsyncClient, key: str, name: str) -> dict[str, Any] | None:
+    """Best company match for a name; None unless the returned name really matches."""
+    data = await _post(http, f"{CONTEXT_DEV}/company/search", key, {"query": name}, "contextDev")
+    want = _norm(_short_name(name))
+    for result in (data.get("results") if isinstance(data, dict) else None) or []:
+        got = _norm(_short_name(str(result.get("name") or "")))
+        if result.get("domain") and want and got and (got == want or got.startswith(want) or want.startswith(got)):
+            return result
+    return None
+
+
+async def brand_logo(http: httpx.AsyncClient, key: str, domain: str) -> str | None:
+    data = await _post(http, f"{CONTEXT_DEV}/brand/retrieve", key, {"type": "by_domain", "domain": domain}, "contextDev")
+    logos = ((data or {}).get("brand") or {}).get("logos") or []
+    ranked = sorted((l for l in logos if isinstance(l, dict) and str(l.get("url", "")).startswith("https://")),
+                    key=lambda l: (l.get("type") != "icon", l.get("mode") not in ("light", "has_opaque_background")))
+    return ranked[0]["url"] if ranked else None
 
 
 async def scrape_markdown(http: httpx.AsyncClient, key: str, url: str) -> str:
@@ -120,61 +139,87 @@ async def scrape_markdown(http: httpx.AsyncClient, key: str, url: str) -> str:
                        "contextDev")
     markdown = data.get("markdown") if isinstance(data, dict) else None
     if isinstance(markdown, dict):
-        if markdown.get("success") is False:
-            return ""
-        return str(markdown.get("data") or "")
+        return str(markdown.get("data") or "") if markdown.get("success") is not False else ""
     return str(markdown or "")
 
 
-def _logo(brand: dict[str, Any]) -> str | None:
-    for logo in brand.get("logos") or []:
-        url = logo.get("url") if isinstance(logo, dict) else logo
-        if isinstance(url, str) and url.startswith("https://"):
-            return url
-    return None
+async def company_news(http: httpx.AsyncClient, key: str, domain: str, limit: int = 2) -> list[dict[str, Any]]:
+    data = await _post(http, f"{CONTEXT_DEV}/news/search", key,
+                       {"searchBy": {"type": "entity", "entity": {"type": "domain", "domain": domain}}, "limit": limit},
+                       "contextDev")
+    return [a for a in (data.get("data") if isinstance(data, dict) else None) or []
+            if isinstance(a, dict) and a.get("url") and a.get("title")
+            and (a.get("match") or {}).get("level", "primary") == "primary"]
 
 
-def _employees(brand: dict[str, Any]) -> str:
-    value = brand.get("employees")
-    if isinstance(value, dict):
-        value = value.get("count") or value.get("range") or value.get("value")
-    return str(value) if value not in (None, "", 0) else ""
+def _usd(amount: Any) -> str:
+    try:
+        value = float(amount)
+    except (TypeError, ValueError):
+        return ""
+    return f"${value / 1e6:.1f}M" if value >= 1e6 else f"${value / 1e3:.0f}k"
 
 
-def _brand_fact(name: str, brand: dict[str, Any]) -> str:
-    parts = [f"{name} ({brand['domain']})"]
-    description = clean_markdown(str(brand.get("description") or ""))[:300]
-    if description:
-        parts.append(description.rstrip(".") + ".")
-    if _employees(brand):
-        parts.append(f"Employees: {_employees(brand)}.")
-    address = brand.get("address")
-    if isinstance(address, dict) and (address.get("country") or address.get("city")):
-        parts.append(f"Based in {', '.join(str(address[k]) for k in ('city', 'country') if address.get(k))}.")
-    return " ".join(parts)
+def company_fact(name: str, company: dict[str, Any]) -> str:
+    """'Kausal (kausal.tech): raised $1.9M in 2 rounds; latest seed of $931k on 2023-10-31; 42 employees; ...'"""
+    parts = []
+    funding = company.get("funding") or {}
+    if funding.get("total_usd"):
+        rounds = funding.get("round_count")
+        parts.append(f"raised {_usd(funding['total_usd'])} in total" + (f" over {rounds} rounds" if rounds else ""))
+    latest = funding.get("latest_round") or {}
+    if latest.get("type"):
+        amount = f" of {_usd(latest['amount_usd'])}" if latest.get("amount_usd") else ""
+        parts.append(f"latest round: {str(latest['type']).replace('_', ' ')}{amount}"
+                     + (f" on {latest['date']}" if latest.get("date") else ""))
+    employees = (company.get("employees") or {}).get("count")
+    if employees:
+        parts.append(f"{employees} employees")
+    if company.get("founded_year"):
+        parts.append(f"founded {company['founded_year']}")
+    hq = company.get("headquarters") or {}
+    if hq.get("city") or hq.get("country_code"):
+        parts.append("HQ " + ", ".join(str(hq[k]) for k in ("city", "country_code") if hq.get(k)))
+    if not parts:
+        description = clean_markdown(str(company.get("description") or ""))
+        parts.append(description[:240])
+    return f"{name} ({company['domain']}): " + "; ".join(p for p in parts if p) + "."
 
 
 async def competitor_profiles(settings: Settings, names: list[str], bundle: EvidenceBundle) -> dict[str, Any]:
-    """Context.dev profile per competitor, added as 'web' evidence. Returns a step summary."""
+    """Context.dev funding profile and latest headline per competitor, added as 'web' evidence."""
     if not settings.context_dev_api_key or not names:
-        return {"found": 0, "tried": 0, "errors": []}
+        return {"found": 0, "tried": 0, "news": 0, "errors": []}
     key = settings.context_dev_api_key
     errors: list[str] = []
-    found = 0
+    found = news_count = 0
 
     async def one(http: httpx.AsyncClient, name: str) -> None:
-        nonlocal found
+        nonlocal found, news_count
         try:
-            brand = await brand_by_name(http, key, name)
+            company = await company_search(http, key, name)
         except (httpx.HTTPError, ValueError) as exc:
             errors.append(f"{name}: {_reason(exc)}")
             return
-        if not brand:
+        if not company:
             return
         found += 1
-        bundle.add("web", f"Context.dev profile: {_brand_fact(name, brand)}",
-                   [Source(name=f"{brand['domain']} (via Context.dev)", url=f"https://{brand['domain']}")],
-                   title=f"{name}: company profile from its website")
+        url = f"https://{company['domain']}"
+        bundle.add("web", f"Context.dev company data: {company_fact(name, company)}",
+                   [Source(name=f"{company['domain']} company profile (via Context.dev)", url=url)],
+                   title=f"{name}: funding and size (Context.dev)")
+        try:
+            articles = await company_news(http, key, company["domain"], limit=1)
+        except (httpx.HTTPError, ValueError):
+            articles = []
+        for article in articles[:1]:
+            news_count += 1
+            when = str(article.get("published_at") or "")[:10]
+            text = clean_markdown(f"{article['title']}. {article.get('description') or ''}")[:400]
+            source = (article.get("source") or {}).get("name") or domain_of(article["url"])
+            bundle.add("web", f"News about {name} ({source}{', ' + when if when else ''}): {text}",
+                       [Source(name=f"{article['title']} ({source}, via Context.dev)", url=article["url"])],
+                       title=f"{name} in the news: {clean_markdown(article['title'])[:90]}")
 
     async with httpx.AsyncClient() as http:
         try:
@@ -182,7 +227,7 @@ async def competitor_profiles(settings: Settings, names: list[str], bundle: Evid
                                    COMPETITOR_BUDGET)
         except asyncio.TimeoutError:
             errors.append("timed out")
-    return {"found": found, "tried": min(len(names), MAX_WEB_COMPETITORS), "errors": errors}
+    return {"found": found, "tried": min(len(names), MAX_WEB_COMPETITORS), "news": news_count, "errors": errors}
 
 
 # ---------- Oxylabs ----------
@@ -238,28 +283,34 @@ async def investor_news(http: httpx.AsyncClient, key: str, investor: str, profil
 
 async def investor_site(http: httpx.AsyncClient, key: str, investor: str, profile: StartupProfile,
                         bundle: EvidenceBundle, web: InvestorWeb) -> None:
-    """Context.dev: find the investor's website, then scrape it for the stated investment focus."""
+    """Context.dev: company search finds the website, brand gives the logo, scraping the site
+    gives the investor's own words on what it backs."""
     short = _short_name(investor)
-    brand = await brand_by_name(http, key, short)
-    if not brand:
-        web.errors.append(f"Context.dev found no website for {short}")
+    company = await company_search(http, key, short)
+    if not company:
+        web.errors.append(f"Context.dev found no company profile for {short}")
         return
-    web.website = f"https://{brand['domain']}"
-    web.description = clean_markdown(str(brand.get("description") or ""))[:300]
-    web.logo = _logo(brand)
+    domain = company["domain"]
+    web.website = f"https://{domain}"
+    web.description = clean_markdown(str(company.get("description") or ""))[:300]
+    logo_job = asyncio.create_task(brand_logo(http, key, domain))
     page = ""
     try:
         page = await scrape_markdown(http, key, web.website)
     except (httpx.HTTPError, ValueError) as exc:
-        web.errors.append(f"Context.dev scrape of {brand['domain']}: {_reason(exc)}")
+        web.errors.append(f"Context.dev scrape of {domain}: {_reason(exc)}")
     focus = pick_sentences(page, [], _profile_words(profile) + ["invest", "seed", "early", "stage", "founders", "ticket"])
     focus = focus or web.description
     if focus:
         web.focus = focus[:400]
         web.focusEvidenceId = bundle.add(
-            "web", f"{short} website ({brand['domain']}): {focus}",
-            [Source(name=f"{brand['domain']} (via Context.dev)", url=web.website)],
-            title=f"{short}: investment focus from its website")
+            "web", f"{short} website ({domain}): {focus}",
+            [Source(name=f"{domain} (via Context.dev)", url=web.website)],
+            title=f"{short}: investment focus in its own words")
+    try:
+        web.logo = await logo_job
+    except (httpx.HTTPError, ValueError):
+        pass
 
 
 async def check_investors(settings: Settings, targets: list[InvestorTarget], profile: StartupProfile,

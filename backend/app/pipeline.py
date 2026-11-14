@@ -270,7 +270,7 @@ async def run_analysis(settings: Settings, profile: StartupProfile) -> AsyncIter
             await queue.put(_evidence_event(bundle))
         if web_task:
             summary, seconds = await web_task
-            detail = f"{summary['found']} of {summary['tried']} found"
+            detail = f"{summary['found']} of {summary['tried']} profiled, {summary.get('news', 0)} headlines"
             if summary["errors"] and not summary["found"]:
                 detail += f" ({summary['errors'][0]})"
             await queue.put({"type": "step", "id": "web:competitors", "state": "done", "seconds": seconds,
