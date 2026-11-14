@@ -209,7 +209,8 @@ async def run_analysis(settings: Settings, profile: StartupProfile) -> AsyncIter
         if isinstance(item, EvidenceBundle):
             bundle = item
             continue
-        detail = f"{item['facts']} facts" if item["state"] == "done" else "failed, continuing without it"
+        detail = (f"{item['facts']} facts" if item["state"] == "done"
+                  else f"failed ({item.get('reason') or 'error'}), continuing without it")
         yield {"type": "step", "id": f"cala:{item['kind']}", "state": item["state"],
                "detail": detail, "seconds": item["seconds"]}
         yield {"type": "evidence", "mode": "demo" if settings.data_mode == "demo" else "cala",

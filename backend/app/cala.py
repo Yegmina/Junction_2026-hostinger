@@ -6,6 +6,7 @@ and the sources Cala returned for it. Later steps may only cite these ids.
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator
@@ -15,6 +16,8 @@ import httpx
 from app.calahttp import cala_request
 from app.config import Settings
 from app.models import Evidence, Source, StartupProfile
+
+logger = logging.getLogger("unicorn.cala")
 
 MAX_FACTS_PER_SEARCH = 8
 MAX_ROWS = 10
@@ -201,9 +204,15 @@ async def stream_evidence(settings: Settings, profile: StartupProfile) -> AsyncI
             index, result = await next_done
             kind, endpoint, _ = queries[index]
             before = len(bundle.evidence)
+            reason = ""
             if isinstance(result, Exception):
                 status = getattr(getattr(result, "response", None), "status_code", None)
-                bundle.errors.append(f"Cala {endpoint} for {kind} failed" + (f" (HTTP {status})" if status else ""))
+                reason = ("Cala account balance exhausted, HTTP 402" if status == 402
+                          else f"HTTP {status}" if status else type(result).__name__)
+                logger.warning("Cala %s for %s failed: %s", endpoint, kind, reason)
+                message = f"Cala {endpoint} for {kind} failed ({reason})"
+                if message not in bundle.errors:
+                    bundle.errors.append(message)
                 state = "failed"
             else:
                 (_ingest_search if endpoint == "search" else _ingest_query)(bundle, kind, result)
@@ -214,6 +223,7 @@ async def stream_evidence(settings: Settings, profile: StartupProfile) -> AsyncI
                 "facts": len(bundle.evidence) - before,
                 "seconds": round(time.monotonic() - started, 1),
                 "evidence": bundle.evidence,
+                "reason": reason,
             }
     yield bundle
 
