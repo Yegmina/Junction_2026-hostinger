@@ -22,6 +22,14 @@ const web = computed(() => {
   if (u.nemotron) out.push(`NVIDIA Nemotron: ${u.nemotron} audit call${u.nemotron === 1 ? "" : "s"}`);
   return out;
 });
+const storage = computed(() => {
+  const s = store.modes?.storage;
+  if (!s || !store.usage) return "";
+  const out = [];
+  if (s.reports !== "files") out.push(`report saved in ${s.reports}`);
+  if (s.cache !== "files") out.push(`API cache and rate limits in ${s.cache}`);
+  return out.join(" · ");
+});
 </script>
 
 <template>
@@ -30,4 +38,5 @@ const web = computed(() => {
     This report used {{ parts.join(" · ") }}<template v-if="store.usage.cached"> ({{ store.usage.cached }} served from the 24 h cache)</template>.
   </p>
   <p v-if="web.length" class="usage-line small"><span class="usage-tag web">Live web</span>{{ web.join(" · ") }}.</p>
+  <p v-if="storage" class="usage-line small"><span class="usage-tag store">Storage</span>{{ storage[0].toUpperCase() + storage.slice(1) }}.</p>
 </template>

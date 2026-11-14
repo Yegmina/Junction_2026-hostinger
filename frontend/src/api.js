@@ -11,6 +11,14 @@ export async function getRun(runId) {
   return res.json();
 }
 
+// Shortlist history of these investors across other stored reports (PostgreSQL on the server).
+export async function investorHistory(names, exclude) {
+  const params = new URLSearchParams(names.map((n) => ["names", n]));
+  if (exclude) params.set("exclude", exclude);
+  const res = await fetch(`${API_BASE}/api/investors/history?${params}`);
+  return res.ok ? res.json() : { available: false, investors: {} };
+}
+
 export async function examples() {
   const res = await fetch(`${API_BASE}/api/examples`);
   return res.json();

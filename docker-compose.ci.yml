@@ -1,0 +1,38 @@
+# CI only: the whole stack, with PostgreSQL 17 and Valkey 8 containers standing in for the Aiven
+# services (same engines and versions). Used by .github/workflows/ci.yml on CRACI runners:
+#   docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --build --wait
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: ci
+    ports:
+      - "127.0.0.1:5432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    environment:
+      DATABASE_URL: postgresql://postgres:ci@postgres:5432/postgres
+      VALKEY_URL: redis://valkey:6379
+      RATE_LIMIT_PER_HOUR: "3"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy

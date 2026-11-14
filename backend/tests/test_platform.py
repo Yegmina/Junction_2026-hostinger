@@ -6,7 +6,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app import calahttp
+from app import calahttp, store
 from app.graph import GraphEntity, company_people, pick_intro_companies, ticket_match
 from app.main import app
 from app.runs import load_run, save_run
@@ -16,8 +16,9 @@ from tests.test_pipeline import PROFILE, _events
 @pytest.fixture(autouse=True)
 def isolated(monkeypatch, tmp_path):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
-    for key in ("CALA_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "ACCESS_CODE"):
+    for key in ("CALA_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "ACCESS_CODE", "DATABASE_URL", "VALKEY_URL"):
         monkeypatch.delenv(key, raising=False)
+    store.reset()
 
 
 def test_cala_request_caches_and_counts():
@@ -58,9 +59,9 @@ def test_demo_run_reports_usage_and_is_saved_for_sharing():
 
 def test_run_ids_are_validated():
     assert TestClient(app).get("/api/runs/..%2Fetc").status_code == 404
-    assert load_run("../../etc/passwd") is None
-    save_run("not-a-run", {}, [])
-    assert load_run("not-a-run") is None
+    assert asyncio.run(load_run("../../etc/passwd")) is None
+    assert asyncio.run(save_run("not-a-run", {}, [])) == ""
+    assert asyncio.run(load_run("not-a-run")) is None
 
 
 def test_access_code_guards_live_runs(monkeypatch):

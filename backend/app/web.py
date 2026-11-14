@@ -14,8 +14,9 @@ from urllib.parse import urlparse
 import httpx
 
 from app.cala import EvidenceBundle
-from app.calahttp import _cache_path, _cache_put, count_web
+from app.calahttp import count_web
 from app.config import Settings
+from app.store import cache_get, cache_key, cache_put
 from app.models import InvestorTarget, InvestorWeb, Source, StartupProfile, WebItem
 
 CONTEXT_DEV = "https://api.context.dev/v1"
@@ -27,29 +28,17 @@ INVESTOR_BUDGET = 45.0
 MAX_WEB_COMPETITORS = 5
 
 
-def _cached(method: str, url: str, body: Any) -> Any | None:
-    import json
-    import time
-
-    path = _cache_path(method, url, None, body)
-    try:
-        if time.time() - path.stat().st_mtime < WEB_CACHE_SECONDS:
-            return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        pass
-    return None
-
-
 async def _post(http: httpx.AsyncClient, url: str, key: str, body: dict[str, Any], counter: str) -> Any:
     count_web(counter)  # counted like Cala: every call the report used, cached or not
-    cached = _cached("POST", url, body)
+    key = cache_key("POST", url, None, body)
+    cached = await cache_get(key, WEB_CACHE_SECONDS)
     if cached is not None:
         return cached
     response = await http.post(url, json=body, timeout=CALL_TIMEOUT,
                                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
     response.raise_for_status()
     data = response.json()
-    _cache_put(_cache_path("POST", url, None, body), data)
+    await cache_put(key, data, WEB_CACHE_SECONDS)
     return data
 
 

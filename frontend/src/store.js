@@ -1,5 +1,5 @@
 import { computed, reactive } from "vue";
-import { analyze, examples, getRun, health } from "./api.js";
+import { analyze, examples, getRun, health, investorHistory } from "./api.js";
 
 // Fallback examples; the backend list (with cached replays) replaces these on load.
 export const EXAMPLES = [
@@ -75,6 +75,7 @@ export const store = reactive({
   runId: "",
   usage: null,
   savedAt: "",
+  history: null,
   needCode: false,
   accessCode: readCode(),
 });
@@ -161,7 +162,23 @@ function reset() {
     runId: "",
     usage: null,
     savedAt: "",
+    history: null,
   });
+}
+
+export const investorKey = (name) => String(name || "").toLowerCase().split(/\s+/).filter(Boolean).join(" ");
+
+// After a report is complete: how often each shortlisted investor came up in other founders' reports.
+async function loadHistory() {
+  const names = (store.committee?.investorTargets || []).map((t) => t.name);
+  if (!names.length || !store.runId) return;
+  const runId = store.runId;
+  try {
+    const history = await investorHistory(names, runId);
+    if (store.runId === runId) store.history = history;
+  } catch {
+    /* history is an extra; the report stands without it */
+  }
 }
 
 export const reportUrl = (runId) => `${location.origin}/r/${runId}`;
@@ -231,7 +248,10 @@ export async function runAnalysis() {
   try {
     await analyze(store.submitted, onEvent, controller.signal, store.accessCode);
     // A finished report gets its own address, so the URL bar is the share link.
-    if (store.finishedAt && store.runId && !store.error) setPath(`/r/${store.runId}`);
+    if (store.finishedAt && store.runId && !store.error) {
+      setPath(`/r/${store.runId}`);
+      loadHistory();
+    }
   } catch (exc) {
     if (exc.name === "AbortError") return;
     if (exc.detail === "access_code_required") {
@@ -265,6 +285,7 @@ export async function loadReport(runId) {
     store.startedAt = Date.now() - (seconds || 0) * 1000;
     store.finishedAt = store.now = Date.now();
     store.runId = runId;
+    loadHistory();
   } catch (exc) {
     store.submitted = null;
     store.editing = true;

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from "vue";
-import { domainOf, pct } from "../store.js";
+import { domainOf, investorKey, pct, store } from "../store.js";
 import { copyText, introEmail } from "../share.js";
 import CiteChips from "./CiteChips.vue";
 
@@ -29,6 +29,13 @@ const news = computed(() => (web.value?.news || []).slice(0, 1));
 const audit = computed(() => props.target.audit);
 const auditLabel = { supported: "✓ Supported", weak: "≈ Weak evidence", contradicted: "✕ Contradicted" };
 const logoOk = ref(true);
+const seen = computed(() => store.history?.investors?.[investorKey(props.target.name)] || null);
+const seenAudit = computed(() => {
+  const s = seen.value;
+  if (!s) return "";
+  return [["supported", s.supported], ["weak", s.weak], ["contradicted", s.contradicted]]
+    .filter(([, n]) => n).map(([label, n]) => `${n} ${label}`).join(", ");
+});
 const intros = computed(() => (v.value?.introPaths || []).slice(0, props.compact ? 1 : 3));
 
 const showEmail = ref(false);
@@ -74,6 +81,11 @@ async function copyEmail() {
         {{ audit.reason }} <CiteChips v-if="!compact" :ids="audit.evidence" />
       </p>
       <p class="why">{{ target.why }}</p>
+      <p v-if="seen && !compact" class="seen small">
+        <span class="muted">Seen before</span> Shortlisted in {{ seen.reports }} other founder{{ seen.reports === 1 ? "'s report" : "s' reports" }}
+        <template v-if="seen.sectors.length"> ({{ seen.sectors.join(", ") }})</template><template v-if="seenAudit">; Nemotron rated it {{ seenAudit }}</template>.
+        <span class="muted">Last {{ seen.lastSeen }}.</span>
+      </p>
       <p v-if="!compact && web?.focus" class="webline">
         <span class="muted small">Their stated focus</span> “{{ web.focus }}”
         <CiteChips :ids="[web.focusEvidenceId].filter(Boolean)" />

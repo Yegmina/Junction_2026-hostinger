@@ -15,6 +15,8 @@ Will your round close, and who should you pitch first? Unicorn Oracle answers bo
 | Tech | **Best Use of Context.dev: Fully Structured Web** | Competitor funding and headcount, investor websites, logos, stated focus and competitor news |
 | Tech | **Best agentic use case of Oxylabs Web API** | Live search-to-scrape for each investor's latest deals, quoted with the source URL |
 | Tech | **Best Use of Nemotron** by NVIDIA | Nemotron 3.5 Super VL independently audits Gemini's shortlist and demotes contradicted leads |
+| Tech | **Best Use of Aiven** | Aiven for PostgreSQL stores every report and answers cross-report investor history; Aiven for Valkey holds the API cache and the shared rate limit |
+| Tech | **Best use of CRACI** | Every push is tested on CRACI runners with deny-by-default network policies; SBOMs and network traces are pulled back through the CRACI API |
 
 ## Judge it in 30 seconds
 
@@ -80,6 +82,27 @@ What the audit has caught in recorded runs:
 
 Nemotron runs with reasoning off by default: on a 60-fact report it answers in about 3 seconds instead of about 55, with a similarly specific audit. Set `NEMOTRON_REASONING=on` to switch it back on.
 
+## Storage on Aiven, builds on CRACI (tech challenges)
+
+**Aiven for PostgreSQL** keeps every finished report, so a shared link (`/r/<runId>`) survives redeploys and server rebuilds. A report is one row (profile and events as JSONB) plus one row per shortlisted investor with its fit score, graph verification and Nemotron verdict. That second table powers a feature files could not: on each investor card, **"Seen before: shortlisted in 3 other founders' reports (fintech, climate tech); Nemotron rated it 2 supported, 1 weak"**. It is one grouped query with `count(*) FILTER (...)`, and it exposes only investor names, counts and sectors, never another founder's data.
+
+**Aiven for Valkey** holds the API response cache with native expiry (Cala 24 h, live web 1 h) and the per-IP rate limit, a sliding window kept atomic by a Lua script. Every backend worker and every redeploy shares the same cache and the same limit.
+
+| Service | Set | Holds | If it is down |
+|---|---|---|---|
+| Aiven for PostgreSQL | `DATABASE_URL` (service URI) | Reports, shortlist rows, cross-report history | Reports are written to files and read from both; history is hidden |
+| Aiven for Valkey | `VALKEY_URL` (service URI) | Cala and web cache, rate limit | File cache and an in-memory limiter |
+
+A failed service is skipped for 60 seconds and logged once, so a database outage never costs a report or slows a run. `/api/health` names the storage in use. Reports saved as files before the database existed import with `python -m app.runs import-files`.
+
+**CRACI** runs CI (`.github/workflows/ci.yml`, `runs-on: craci`). Three jobs:
+
+- backend tests against PostgreSQL 17 and Valkey 8 containers (the engines Aiven runs);
+- the frontend build;
+- a smoke test of the whole Docker stack through nginx. It replays an example, reads the report back from PostgreSQL, checks investor history and the Valkey rate limit (3 runs, then 429), then deletes the backend container and its data volume and checks the report is still there.
+
+Each job declares a deny-by-default network policy (`cracicorp/setup` with only the registries it needs: PyPI, npm, Docker Hub, GitHub). CRACI can then record a complete SBOM and a network trace, and a test that tried to call a live API, or a dependency that phoned home, would be blocked and listed as a proxy violation. After each CI run, `.github/workflows/supply-chain.yml` fetches every job's CycloneDX SBOM and network trace through the CRACI API (`/v1preview1/sbom`, `/v1preview1/network-trace`), attaches them to the run, writes a summary table, and fails if any job reached a host outside the expected registries.
+
 ## Limitations
 
 - A "warm intro" is a graph link: the person founded or runs a company this investor funded. It does not mean they know you or will make the intro.
@@ -137,7 +160,7 @@ DOMAIN=oracle.example.com docker compose -f docker-compose.yml -f docker-compose
 
 Without a domain, use an sslip.io name for the server IP, e.g. `DOMAIN=93-127-213-190.sslip.io`.
 
-Saved reports and the 24 h Cala response cache live in the `oracle_data` volume.
+Without `DATABASE_URL` and `VALKEY_URL`, saved reports and the API cache live in the `oracle_data` volume. With them they live on Aiven (see above), and the volume is only a fallback.
 
 ## Tests
 
@@ -145,18 +168,21 @@ Saved reports and the 24 h Cala response cache live in the `oracle_data` volume.
 cd backend && .venv/bin/python -m pytest -q
 ```
 
+The PostgreSQL and Valkey tests run when `TEST_DATABASE_URL` and `TEST_VALKEY_URL` point at test services (CI starts both). `python ci/smoke.py` checks a running stack end to end.
+
 ## API
 
-- `GET /api/health` returns `{"dataMode": "cala"|"demo", "analysisMode": "openai"|"gemini"|"demo", "accessCodeRequired": bool}`.
+- `GET /api/health` returns `{"dataMode": "cala"|"demo", "analysisMode": "openai"|"gemini"|"demo", "accessCodeRequired": bool, "storage": {"reports": ..., "cache": ...}}`.
 - `POST /api/analyze` takes a startup profile (`name`, `description`, `sector`, `country`, `stage`, `targetAmountEur`, `horizonMonths`). It streams server-sent events: `start`, `steps`, `step`, `evidence`, `graph`, `plan`, `committee`, `usage`, `done` and `error`. Scenarios and the investor shortlist are built concurrently, so the shortlist usually arrives first.
 - `GET /api/runs/{runId}` returns a finished report (profile plus its events). The UI opens it at `/r/{runId}`.
+- `GET /api/investors/history?names=...&exclude={runId}` returns, per investor, how many other stored reports shortlisted it, their sectors and the audit verdicts (PostgreSQL only).
 
 ## Safety for a public demo
 
-- Requests are rate-limited per IP (`RATE_LIMIT_PER_HOUR`).
+- Live runs are rate-limited per IP (`RATE_LIMIT_PER_HOUR`), shared across workers through Valkey.
 - Set `ACCESS_CODE` to make live runs invite-only (sent as `X-Access-Code`); example replays and saved reports stay public.
 - Gemini calls retry once on 429/5xx/timeouts, then fall back to `GEMINI_FALLBACK_MODEL` (default `gemini-flash-lite-latest`).
-- Cala responses are cached on disk for 24 h, so repeated runs are faster and cheaper.
+- Cala responses are cached for 24 h (Valkey, or disk without it), so repeated runs are faster and cheaper.
 - Users cannot pass URLs to the server.
 - Inputs are length-limited.
 - CORS is restricted to configured origins.

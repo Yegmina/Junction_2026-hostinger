@@ -1,0 +1,103 @@
+# Every push and pull request is built and tested on CRACI runners (runs-on: craci).
+# Each job declares a deny-by-default network policy: it may reach only the package registries it
+# needs, so CRACI can record a complete SBOM and a network trace, and anything unexpected
+# (a compromised dependency calling home, a test hitting a live API) is blocked and shows up as a
+# proxy violation. The supply-chain workflow then pulls those SBOMs and traces through the CRACI API.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests (PostgreSQL 17 + Valkey 8)
+    runs-on: craci
+    timeout-minutes: 15
+    steps:
+      - uses: cracicorp/setup@v1
+        with:
+          size: "2"
+          network: |
+            default: deny
+            presets: [github, pypi, dockerhub]
+      - uses: actions/checkout@v4
+      - name: Start PostgreSQL and Valkey (the engines Aiven runs in production)
+        run: |
+          docker run -d --name pg -e POSTGRES_PASSWORD=ci -p 127.0.0.1:5432:5432 --tmpfs /var/lib/postgresql/data postgres:17-alpine
+          docker run -d --name vk -p 127.0.0.1:6379:6379 valkey/valkey:8-alpine
+      - name: Install
+        working-directory: backend
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --disable-pip-version-check -q -r requirements-dev.txt
+      - name: Wait for PostgreSQL
+        run: for i in $(seq 1 30); do docker exec pg pg_isready -h 127.0.0.1 -U postgres && break; sleep 1; done
+      - name: Test
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:ci@127.0.0.1:5432/postgres
+          TEST_VALKEY_URL: redis://127.0.0.1:6379
+        # -rs lists skipped tests: with the services up, none should be skipped.
+        run: .venv/bin/python -m pytest -q -rs
+
+  frontend:
+    name: Frontend build
+    runs-on: craci
+    timeout-minutes: 10
+    steps:
+      - uses: cracicorp/setup@v1
+        with:
+          size: "2"
+          network: |
+            default: deny
+            presets: [github, npm]
+      - uses: actions/checkout@v4
+      - name: Install and build
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+  stack:
+    name: Docker stack smoke test
+    needs: [backend, frontend]
+    runs-on: craci
+    timeout-minutes: 20
+    steps:
+      - uses: cracicorp/setup@v1
+        with:
+          size: "4"
+          network: |
+            default: deny
+            presets: [github, dockerhub, pypi, npm]
+      - uses: actions/checkout@v4
+      - name: Build and start the stack
+        run: docker compose -p ci -f docker-compose.yml -f docker-compose.ci.yml up -d --build --wait
+      - name: Smoke test through nginx
+        id: smoke
+        run: |
+          python3 ci/smoke.py | tee smoke.txt
+          echo "run_id=$(grep '^run_id=' smoke.txt | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+      - name: Replace the backend container and wipe its data volume
+        run: |
+          docker compose -p ci -f docker-compose.yml -f docker-compose.ci.yml rm -sf backend
+          docker volume rm ci_oracle_data
+          docker compose -p ci -f docker-compose.yml -f docker-compose.ci.yml up -d --wait backend
+      - name: The saved report is still there (it lives in PostgreSQL)
+        run: python3 ci/smoke.py --after-restart "${{ steps.smoke.outputs.run_id }}"
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -p ci -f docker-compose.yml -f docker-compose.ci.yml logs --tail 80
+      - name: Stop
+        if: always()
+        run: docker compose -p ci -f docker-compose.yml -f docker-compose.ci.yml down -v

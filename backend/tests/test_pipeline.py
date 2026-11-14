@@ -34,7 +34,8 @@ def _events(response):
 
 def test_health_reports_demo_modes():
     body = TestClient(app).get("/api/health").json()
-    assert body == {"status": "ok", "dataMode": "demo", "analysisMode": "demo", "accessCodeRequired": False}
+    assert body == {"status": "ok", "dataMode": "demo", "analysisMode": "demo", "accessCodeRequired": False,
+                    "storage": {"reports": "files", "cache": "files"}}
 
 
 def test_analyze_streams_full_demo_run():

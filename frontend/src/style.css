@@ -454,3 +454,8 @@ textarea { resize: vertical; }
 .audit.contradicted .audit-tag { color: var(--bad); }
 .usage-tag.web { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
 .audit-summary { margin: 0 0 0.6rem; } .audit-summary .audit-tag { color: var(--accent); }
+
+/* Cross-report history (PostgreSQL) and storage line */
+.usage-tag.store { background: color-mix(in srgb, var(--muted) 16%, transparent); color: var(--muted); }
+.inv .seen { margin: 0.3rem 0; padding: 0.3rem 0.55rem; border-left: 3px solid var(--line); }
+.inv .seen .muted:first-child { font-weight: 700; margin-right: 0.3rem; }
