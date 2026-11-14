@@ -22,6 +22,16 @@ from app.models import Audit, Committee, StartupProfile
 NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 AUDIT_TIMEOUT = 90.0
 VERDICTS = ("supported", "weak", "contradicted")
+AUDIT_SCHEMA = {
+    "type": "object", "additionalProperties": False, "required": ["audits", "summary"],
+    "properties": {
+        "audits": {"type": "array", "items": {
+            "type": "object", "additionalProperties": False, "required": ["name", "verdict", "reason", "evidence"],
+            "properties": {"name": {"type": "string"}, "verdict": {"type": "string", "enum": list(VERDICTS)},
+                           "reason": {"type": "string"}, "evidence": {"type": "array", "items": {"type": "string"}}}}},
+        "summary": {"type": "string"},
+    },
+}
 
 AUDIT_PROMPT = (
     "You are an independent due-diligence auditor checking another AI's investor shortlist for a startup "
@@ -89,6 +99,9 @@ async def _chat(settings: Settings, payload: dict[str, Any]) -> str:
         "max_tokens": 16384 if settings.nemotron_reasoning else 4096,
         # Measured on a 60-fact report: reasoning off answers in ~3 s, on in ~55 s with a similar audit.
         "chat_template_kwargs": {"enable_thinking": settings.nemotron_reasoning},
+        # The server enforces the schema while generating: free-form JSON was malformed in ~1 of 3 runs.
+        "response_format": {"type": "json_schema", "json_schema": {"name": "shortlist_audit", "schema": AUDIT_SCHEMA,
+                                                                   "strict": True}},
     }
     headers = {"Authorization": f"Bearer {settings.nvidia_api_key}", "Accept": "application/json"}
     last: Exception | None = None
@@ -122,7 +135,10 @@ async def audit_shortlist(settings: Settings, profile: StartupProfile, committee
         "evidence": [{"id": e.id, "kind": e.kind, "text": e.text} for e in bundle.evidence],
         "shortlist": _shortlist(committee, checks),
     }
-    raw = parse_json(await _chat(settings, payload))
+    try:
+        raw = parse_json(await _chat(settings, payload))
+    except ValueError:  # json.JSONDecodeError included: one more try before giving up
+        raw = parse_json(await _chat(settings, payload))
     valid = {e.id for e in bundle.evidence}
     audits: dict[str, Audit] = {}
     for item in raw.get("audits") or []:
