@@ -6,6 +6,8 @@ Will your round close, and who should you pitch first? Unicorn Oracle answers bo
 
 ![Report overview: who to pitch first, verified in the Cala graph](docs/screenshots/overview.png)
 
+**Junction 2026 challenges:** main challenge **Make Unicorns Real** by Cala (FinTech track); tech challenge **Best Use of Gemini API** by Google DeepMind (Gemini runs the AI investment committee, drivers and scenarios).
+
 ## Judge it in 30 seconds
 
 1. Open https://93-127-213-190.sslip.io and click the **CSRD reporting SaaS** example chip, then **Forecast my round**. It replays a real recorded live run in about 9 seconds.
