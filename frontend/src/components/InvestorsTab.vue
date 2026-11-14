@@ -3,10 +3,17 @@ import { ref } from "vue";
 import { pct, store } from "../store.js";
 import CiteChips from "./CiteChips.vue";
 import CompetitorBackers from "./CompetitorBackers.vue";
+import NetworkDiagram from "./NetworkDiagram.vue";
+import { copyText, investorListMarkdown } from "../share.js";
 import InvestorCard from "./InvestorCard.vue";
 import Skeleton from "./Skeleton.vue";
 
 const openMember = ref("");
+const copied = ref(false);
+async function copyList() {
+  copied.value = await copyText(investorListMarkdown());
+  setTimeout(() => (copied.value = false), 1800);
+}
 const stanceLabel = { back: "Would back", conditional: "Conditional", pass: "Would pass" };
 const initials = (p) => p.split(" ").slice(0, 2).map((w) => w[0]).join("");
 </script>
@@ -35,8 +42,10 @@ const initials = (p) => p.split(" ").slice(0, 2).map((w) => w[0]).join("");
     </section>
 
     <section class="card">
-      <h3>Lead investors to approach</h3>
-      <p class="muted small">Only investors named in Cala evidence. Each is checked in the Cala graph for its portfolio, recent deals and conflicts with your competitors.</p>
+      <header class="card-head"><h3>Lead investors to approach</h3>
+        <button v-if="store.committee?.investorTargets.length" type="button" class="ghost small-btn" @click="copyList">
+          {{ copied ? "Copied ✓" : "Copy investor list" }}</button></header>
+      <p class="muted small">Only investors named in Cala evidence. Each is checked in the Cala graph for its portfolio, round sizes, warm intro paths and conflicts with your competitors.</p>
       <TransitionGroup v-if="store.committee" tag="ol" name="list" class="leads">
         <li v-for="(t, i) in store.committee.investorTargets" :key="t.name">
           <InvestorCard :target="t" :rank="i + 1" />
@@ -46,6 +55,7 @@ const initials = (p) => p.split(" ").slice(0, 2).map((w) => w[0]).join("");
       <p v-if="store.committee && !store.committee.investorTargets.length" class="muted">No investor in the evidence matched well enough.</p>
     </section>
 
+    <NetworkDiagram />
     <CompetitorBackers />
   </div>
 </template>

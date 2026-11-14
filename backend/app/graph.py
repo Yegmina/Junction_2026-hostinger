@@ -14,6 +14,7 @@ from typing import Any
 
 import httpx
 
+from app.calahttp import cala_request
 from app.config import Settings
 
 ENTITY_TIMEOUT = 25.0
@@ -49,23 +50,21 @@ class GraphClient:
         self._headers = {"X-API-KEY": settings.cala_api_key or "", "Content-Type": "application/json"}
 
     async def search(self, name: str, limit: int = 8) -> list[GraphEntity]:
-        r = await self._http.get(self._base, params={"name": name[:100], "limit": limit}, headers=self._headers,
-                                 timeout=ENTITY_TIMEOUT)
-        r.raise_for_status()
+        data = await cala_request(self._http, "GET", self._base, kind="entity", headers=self._headers,
+                                  params={"name": name[:100], "limit": limit}, timeout=ENTITY_TIMEOUT)
         return [
             GraphEntity(e["id"], e.get("name", ""), e.get("entity_type", ""), e.get("description") or "")
-            for e in r.json().get("entities", [])
+            for e in data.get("entities", [])
         ]
 
     async def relationships(self, entity_id: str) -> dict[str, list[str]]:
-        r = await self._http.get(f"{self._base}/{entity_id}/introspection", headers=self._headers, timeout=ENTITY_TIMEOUT)
-        r.raise_for_status()
-        return r.json().get("relationships") or {}
+        data = await cala_request(self._http, "GET", f"{self._base}/{entity_id}/introspection", kind="entity",
+                                  headers=self._headers, timeout=ENTITY_TIMEOUT)
+        return data.get("relationships") or {}
 
     async def retrieve(self, entity_id: str, body: dict[str, Any]) -> dict[str, Any]:
-        r = await self._http.post(f"{self._base}/{entity_id}", json=body, headers=self._headers, timeout=ENTITY_TIMEOUT)
-        r.raise_for_status()
-        return r.json()
+        return await cala_request(self._http, "POST", f"{self._base}/{entity_id}", kind="entity",
+                                  headers=self._headers, body=body, timeout=ENTITY_TIMEOUT)
 
 
 def _related(payload: dict[str, Any], direction: str, rel: str) -> list[GraphEntity]:
@@ -174,3 +173,89 @@ def latest_deal(deals: list[dict[str, Any]]) -> str:
 
 def recent_year() -> int:
     return date.today().year - 2
+
+
+# --- Warm intro paths: people who founded or run an investor's portfolio companies ---------------
+
+PEOPLE_EDGES = {"FOUNDED": "founder", "IS_CEO_OF": "CEO", "IS_CTO_OF": "CTO"}
+
+
+async def company_people(client: GraphClient, company: GraphEntity) -> list[tuple[str, str, str]]:
+    """(person, role, company) for founders and executives of one company; one row per person."""
+    try:
+        incoming = set((await client.relationships(company.id)).get("incoming") or [])
+        wanted = {r: {"limit": 3} for r in PEOPLE_EDGES if r in incoming}
+        if not wanted:
+            return []
+        payload = await client.retrieve(company.id, {"relationships": {"incoming": wanted}})
+    except httpx.HTTPError:
+        return []
+    people: dict[str, tuple[str, str, str]] = {}
+    for rel, role in PEOPLE_EDGES.items():  # founder first, so a founder-CEO reads as founder
+        for person in _related(payload, "incoming", rel):
+            if person.entity_type == "Person" and person.name and person.name not in people:
+                people[person.name] = (person.name, role, company.name)
+    return list(people.values())
+
+
+def pick_intro_companies(portfolio: list[GraphEntity], corpus: str, limit: int = 4) -> list[GraphEntity]:
+    """Portfolio companies named in the evidence first (most relevant), then the rest in graph order."""
+    mentioned = [c for c in portfolio if norm(c.name) and norm(c.name) in corpus]
+    rest = [c for c in portfolio if c not in mentioned]
+    return (mentioned + rest)[:limit]
+
+
+# --- Ticket-size match: what kind of rounds an investor actually joins --------------------------
+
+USD_TO_EUR = 0.92
+ROUND_STAGE = {"PRE_SEED": "pre-seed", "SEED": "seed", "SERIES_A": "series-a", "SERIES_B": "series-b"}
+STAGE_NAMES = {"pre-seed": "pre-seed", "seed": "seed", "series-a": "Series A", "series-b": "Series B", "growth": "growth"}
+
+
+def round_stage(label: str) -> str | None:
+    label = (label or "").upper().replace("-", "_").replace(" ", "_")
+    if label in ROUND_STAGE:
+        return ROUND_STAGE[label]
+    if label.startswith("SERIES_") or label in ("GROWTH", "LATE_STAGE", "PRIVATE_EQUITY"):
+        return "growth"
+    return None
+
+
+def deal_eur(deal: dict[str, Any]) -> float | None:
+    try:
+        value = float(deal.get("value"))
+    except (TypeError, ValueError):
+        return None
+    if value <= 0:
+        return None
+    units = str(deal.get("units") or "EUR").upper()
+    return value * USD_TO_EUR if units == "USD" else value if units == "EUR" else None
+
+
+def _money(value: float) -> str:
+    return f"€{value / 1e6:.1f}M".replace(".0M", "M") if value >= 1e6 else f"€{value / 1e3:.0f}k"
+
+
+def ticket_match(deals: list[dict[str, Any]], stage: str, target_eur: float) -> dict[str, Any]:
+    """Compare the rounds an investor joined (stage and round size) with the founder's raise."""
+    stages: list[str] = []
+    for d in deals:
+        s = round_stage(d.get("label", ""))
+        if s and s not in stages:
+            stages.append(s)
+    stages.sort(key=list(STAGE_NAMES).index)
+    amounts = sorted(a for a in (deal_eur(d) for d in deals) if a)
+    if not stages and not amounts:
+        return {"stages": [], "minEur": None, "maxEur": None, "rounds": len(deals), "match": "unknown",
+                "text": "No round details in the Cala graph yet."}
+    low, high = (amounts[0], amounts[-1]) if amounts else (None, None)
+    stage_ok = stage in stages if stages else None
+    # Round sizes are totals, so allow a generous band around what this investor has joined.
+    size_ok = (low / 2 <= target_eur <= high * 2) if amounts else None
+    checks = [c for c in (stage_ok, size_ok) if c is not None]
+    match = "yes" if all(checks) else "no" if not any(checks) else "partial"
+    stage_text = "/".join(STAGE_NAMES[s] for s in stages) or "undisclosed-stage"
+    size_text = (f" of {_money(low)}" if low == high else f" of {_money(low)}–{_money(high)}") if amounts else ""
+    verdict = {"yes": "fits your", "partial": "partly fits your", "no": "does not fit your"}[match]
+    text = f"Joined {stage_text} rounds{size_text}; {verdict} {_money(target_eur)} {STAGE_NAMES.get(stage, stage)}."
+    return {"stages": stages, "minEur": low, "maxEur": high, "rounds": len(deals), "match": match, "text": text}

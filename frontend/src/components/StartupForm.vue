@@ -1,6 +1,12 @@
 <script setup>
-import { computed } from "vue";
-import { eur, runAnalysis, store } from "../store.js";
+import { computed, ref } from "vue";
+import { eur, runAnalysis, saveAccessCode, store } from "../store.js";
+
+const code = ref(store.accessCode);
+function submit() {
+  if (store.needCode && code.value.trim()) saveAccessCode(code.value);
+  runAnalysis();
+}
 
 const stages = [
   ["pre-seed", "Pre-seed"],
@@ -27,7 +33,7 @@ const isExample = computed(() =>
 </script>
 
 <template>
-  <form class="card form" @submit.prevent="runAnalysis">
+  <form class="card form" @submit.prevent="submit">
     <div class="examples">
       <span class="muted small">Try an example:</span>
       <button v-for="ex in store.examples" :key="ex.label" type="button" class="chip" @click="useExample(ex)">{{ ex.label }}</button>
@@ -56,6 +62,11 @@ const isExample = computed(() =>
       </label>
     </div>
     <p v-if="amountHint.text" :class="['hint', { warnText: amountHint.warn }]">{{ amountHint.text }}</p>
+    <div v-if="store.needCode && !isExample" class="code-box">
+      <label for="access-code"><b>Access code</b> <span class="muted small">Live runs on this server are invite-only. Examples stay open to everyone.</span></label>
+      <input id="access-code" v-model="code" type="password" autocomplete="off" placeholder="Enter the code from the team" />
+    </div>
+    <p v-if="store.error && store.editing" class="error-box small" role="alert">{{ store.error }}</p>
     <button type="submit" class="primary big-btn" :disabled="store.running">Forecast my round</button>
     <p class="muted small center">{{ isExample ? "Example: replays a recorded live run in a few seconds." : "Live run takes about a minute. Every claim links to its Cala source." }}</p>
   </form>

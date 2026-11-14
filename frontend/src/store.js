@@ -1,5 +1,5 @@
 import { computed, reactive } from "vue";
-import { analyze, examples, health } from "./api.js";
+import { analyze, examples, getRun, health } from "./api.js";
 
 // Fallback examples; the backend list (with cached replays) replaces these on load.
 export const EXAMPLES = [
@@ -71,7 +71,32 @@ export const store = reactive({
   tab: "overview",
   openEvidenceId: "",
   editing: true,
+  runId: "",
+  usage: null,
+  savedAt: "",
+  needCode: false,
+  accessCode: readCode(),
 });
+
+const CODE_KEY = "unicorn-oracle-access-code";
+
+function readCode() {
+  try {
+    return localStorage.getItem(CODE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+export function saveAccessCode(code) {
+  store.accessCode = code.trim();
+  store.needCode = false;
+  try {
+    localStorage.setItem(CODE_KEY, store.accessCode);
+  } catch {
+    /* private mode: the code lives for this tab only */
+  }
+}
 
 let controller = null;
 let ticker = null;
@@ -132,12 +157,22 @@ function reset() {
     finishedAt: 0,
     tab: "overview",
     openEvidenceId: "",
+    runId: "",
+    usage: null,
+    savedAt: "",
   });
+}
+
+export const reportUrl = (runId) => `${location.origin}/r/${runId}`;
+
+function setPath(path) {
+  if (location.pathname !== path) history.pushState(null, "", path);
 }
 
 function onEvent(event) {
   switch (event.type) {
     case "start":
+      store.runId = event.runId || "";
       store.question = event.question;
       store.dataMode = event.dataMode;
       store.replay = event.replay || null;
@@ -168,8 +203,12 @@ function onEvent(event) {
     case "committee":
       store.committee = event.committee;
       break;
+    case "usage":
+      store.usage = event.usage;
+      break;
     case "done":
       store.finishedAt = Date.now();
+      store.runId = event.runId || store.runId;
       break;
     case "error":
       store.error = event.message;
@@ -187,16 +226,56 @@ export async function runAnalysis() {
   store.startedAt = store.now = Date.now();
   clearInterval(ticker);
   ticker = setInterval(() => (store.now = Date.now()), 250);
+  setPath("/");
   try {
-    await analyze(store.submitted, onEvent, controller.signal);
+    await analyze(store.submitted, onEvent, controller.signal, store.accessCode);
+    // A finished report gets its own address, so the URL bar is the share link.
+    if (store.finishedAt && store.runId && !store.error) setPath(`/r/${store.runId}`);
   } catch (exc) {
-    if (exc.name !== "AbortError") store.error = exc.message;
+    if (exc.name === "AbortError") return;
+    if (exc.detail === "access_code_required") {
+      store.needCode = true;
+      store.editing = true;
+      store.error = store.accessCode ? "That access code was not accepted." : "";
+    } else {
+      store.error = exc.message;
+    }
   } finally {
     store.running = false;
     store.finishedAt ||= Date.now();
     store.steps.forEach((s) => s.state === "running" && (s.state = "failed"));
     clearInterval(ticker);
   }
+}
+
+// Open a saved report (/r/<runId>) by applying its recorded events at once.
+export async function loadReport(runId) {
+  reset();
+  store.editing = false;
+  store.running = true;
+  try {
+    const run = await getRun(runId);
+    store.submitted = run.profile;
+    store.profile = { ...run.profile };
+    run.events.forEach(onEvent);
+    store.savedAt = run.savedAt || "";
+    const seconds = run.events.find((e) => e.type === "done")?.seconds
+      ?? run.events.find((e) => e.type === "start")?.replay?.originalSeconds;
+    store.startedAt = Date.now() - (seconds || 0) * 1000;
+    store.finishedAt = store.now = Date.now();
+    store.runId = runId;
+  } catch (exc) {
+    store.submitted = null;
+    store.editing = true;
+    store.error = exc.message;
+  } finally {
+    store.running = false;
+  }
+}
+
+export function newForecast() {
+  store.editing = true;
+  setPath("/");
 }
 
 export function cancelAnalysis() {
@@ -206,6 +285,7 @@ export function cancelAnalysis() {
 export async function loadHealth() {
   try {
     store.modes = await health();
+    if (store.modes.accessCodeRequired && !store.accessCode) store.needCode = true;
   } catch {
     store.modes = null;
   }

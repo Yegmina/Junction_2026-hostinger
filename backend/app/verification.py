@@ -15,21 +15,26 @@ from app.graph import (
     GraphClient,
     GraphEntity,
     InvestorGraph,
+    company_people,
     competitor_backers,
     deals_since,
     investor_graph,
     latest_deal,
     norm,
+    pick_intro_companies,
     recent_year,
     resolve,
+    ticket_match,
 )
-from app.models import Conflict, InvestorTarget, InvestorVerification, Source, StartupProfile
+from app.models import Conflict, IntroPath, InvestorTarget, InvestorVerification, Source, StartupProfile, TicketMatch
 
 GRAPH_SOURCE = [Source(name="Cala knowledge graph")]
 MAX_COMPETITORS = 8
 SHOWN_COMPETITORS = 6
 COMPETITOR_BUDGET = 45.0
 INVESTOR_BUDGET = 60.0
+INTRO_BUDGET = 20.0
+INTROS_PER_INVESTOR = 3
 
 
 @dataclass
@@ -117,10 +122,25 @@ def _conflicts(target: str, graph: InvestorGraph | None, cmap: CompetitorMap, bu
     return list(conflicts.values())
 
 
+async def _intro_paths(client: GraphClient, graph: InvestorGraph, corpus: str) -> list[IntroPath]:
+    companies = pick_intro_companies(graph.portfolio, corpus)
+    try:
+        found = await asyncio.wait_for(asyncio.gather(*(company_people(client, c) for c in companies)), INTRO_BUDGET)
+    except asyncio.TimeoutError:
+        return []
+    # One person per company keeps the list varied: several companies beat several people at one.
+    paths = [IntroPath(person=p[0][0], role=p[0][1], company=p[0][2]) for p in found if p]
+    return paths[:INTROS_PER_INVESTOR]
+
+
 async def verify_targets(
-    settings: Settings, targets: list[InvestorTarget], cmap: CompetitorMap, bundle: EvidenceBundle
+    settings: Settings, targets: list[InvestorTarget], cmap: CompetitorMap, bundle: EvidenceBundle,
+    profile: StartupProfile | None = None,
 ) -> list[InvestorTarget]:
     graphs: dict[str, InvestorGraph | None] = {t.name: None for t in targets}
+    intros: dict[str, list[IntroPath]] = {}
+    corpus = " ".join(norm(e.text) for e in bundle.evidence)
+    competitor_ids = {c.id for c in cmap.competitors}
     if settings.cala_api_key and targets:
         async with httpx.AsyncClient() as http:
             client = GraphClient(settings, http)
@@ -129,7 +149,12 @@ async def verify_targets(
                 entity = await resolve(client, target.name, investor=True)
                 if entity:
                     graphs[target.name] = InvestorGraph(entity=entity)
-                    graphs[target.name] = await investor_graph(client, entity)
+                    graph = await investor_graph(client, entity)
+                    graphs[target.name] = graph
+                    # Founders of a competitor are not a warm intro.
+                    safe = InvestorGraph(entity=graph.entity,
+                                         portfolio=[c for c in graph.portfolio if c.id not in competitor_ids])
+                    intros[target.name] = await _intro_paths(client, safe, corpus)
 
             try:
                 await asyncio.wait_for(asyncio.gather(*(one(t) for t in targets)), INVESTOR_BUDGET)
@@ -151,19 +176,33 @@ async def verify_targets(
             recentDeals=deals_since(graph.deals, year) if graph else 0,
             latestDeal=latest_deal(graph.deals) if graph else "",
             conflicts=_conflicts(target.name, graph, cmap, bundle),
+            introPaths=intros.get(target.name, []),
+            ticket=(TicketMatch(**ticket_match(graph.deals, profile.stage, profile.targetAmountEur))
+                    if graph and profile else None),
         )
         if graph and graph.portfolio:
             portfolio = ", ".join(c.name for c in graph.portfolio[:10])
             deal_note = f" Latest recorded deal {verification.latestDeal}." if verification.latestDeal else ""
-            bundle.add("graph", f"Cala graph: {graph.entity.name} INVESTED_IN {portfolio}"
-                       f"{' and more' if len(graph.portfolio) > 10 else ''}.{deal_note}", GRAPH_SOURCE,
-                       title=f"{graph.entity.name} portfolio ({len(graph.portfolio)} companies)")
-            graph_fact = bundle.evidence[-1].id
-            if graph_fact not in target.evidence:
-                target = target.model_copy(update={"evidence": [*target.evidence, graph_fact]})
+            facts = [bundle.add("graph", f"Cala graph: {graph.entity.name} INVESTED_IN {portfolio}"
+                                f"{' and more' if len(graph.portfolio) > 10 else ''}.{deal_note}", GRAPH_SOURCE,
+                                title=f"{graph.entity.name} portfolio ({len(graph.portfolio)} companies)")]
+        else:
+            facts = []
+        if verification.introPaths:
+            people = "; ".join(f"{p.person} ({p.role} of {p.company})" for p in verification.introPaths)
+            facts.append(bundle.add("graph", f"Cala graph: people behind {verification.entityName} portfolio "
+                                    f"companies: {people}.", GRAPH_SOURCE, title=f"Warm intros to {verification.entityName}"))
+        if verification.ticket and verification.ticket.match != "unknown":
+            facts.append(bundle.add("graph", f"Cala graph: {verification.entityName}: {verification.ticket.text}",
+                                    GRAPH_SOURCE, title=f"{verification.entityName} round sizes"))
+        new = [f for f in facts if f and f not in target.evidence]
+        if new:
+            target = target.model_copy(update={"evidence": [*target.evidence, *new]})
         enriched.append(target.model_copy(update={"verification": verification}))
     # Graph-confirmed conflicts go last; then verified before unverified; then by fit.
     # Text co-mentions are shown as "possible links" but do not demote an investor on their own.
     enriched.sort(key=lambda t: (any(c.basis == "graph" for c in t.verification.conflicts),
-                                 not t.verification.verified, -t.fitScore))
+                                 not t.verification.verified,
+                                 bool(t.verification.ticket and t.verification.ticket.match == "no"),
+                                 -t.fitScore))
     return enriched

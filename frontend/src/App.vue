@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted } from "vue";
-import { eur, loadHealth, store } from "./store.js";
+import { computed, onMounted, ref } from "vue";
+import { eur, loadHealth, loadReport, newForecast, reportUrl, store } from "./store.js";
+import { copyText, investorListMarkdown } from "./share.js";
 import DriversTab from "./components/DriversTab.vue";
 import EvidenceDrawer from "./components/EvidenceDrawer.vue";
 import EvidenceTab from "./components/EvidenceTab.vue";
@@ -28,12 +29,29 @@ const howItWorks = [
   ["Committee", "Three AI partners debate and shortlist real leads from Cala."],
 ];
 
-onMounted(loadHealth);
+const copied = ref("");
+async function copy(what) {
+  const ok = await copyText(what === "link" ? reportUrl(store.runId) : investorListMarkdown());
+  copied.value = ok ? what : "";
+  setTimeout(() => (copied.value = ""), 1800);
+}
+
+function route() {
+  const match = location.pathname.match(/^\/r\/(run-[0-9a-f]{10})\/?$/);
+  if (match) loadReport(match[1]);
+  else if (store.submitted && !store.running) store.editing = true;
+}
+
+onMounted(() => {
+  loadHealth();
+  if (location.pathname !== "/") route();
+  window.addEventListener("popstate", route);
+});
 </script>
 
 <template>
   <header class="top">
-    <button type="button" class="brand" @click="store.editing = !store.running">
+    <button type="button" class="brand" @click="!store.running && newForecast()">
       <span class="logo" aria-hidden="true">🦄</span>
       <span><b>Unicorn Oracle</b><small>Fundraising foresight on Cala data</small></span>
     </button>
@@ -63,11 +81,18 @@ onMounted(loadHealth);
         <p class="muted small">{{ store.submitted.sector }} · {{ store.submitted.country }} · {{ store.submitted.stage }} ·
           {{ eur(store.submitted.targetAmountEur) }} in {{ store.submitted.horizonMonths }} months</p>
       </div>
-      <button type="button" class="ghost" :disabled="store.running" @click="store.editing = true">New forecast</button>
+      <div class="bar-actions">
+        <button v-if="store.runId && !store.running && !store.error" type="button" class="ghost small-btn" @click="copy('link')">
+          {{ copied === "link" ? "Link copied ✓" : "🔗 Copy share link" }}</button>
+        <button v-if="store.committee?.investorTargets.length && !store.running" type="button" class="ghost small-btn" @click="copy('list')">
+          {{ copied === "list" ? "Copied ✓" : "Copy investor list" }}</button>
+        <button type="button" class="ghost small-btn" :disabled="store.running" @click="newForecast">New forecast</button>
+      </div>
     </section>
 
     <p v-if="store.dataMode === 'demo'" class="warn">Demo mode: no Cala key configured, so every company, investor and figure is fictional.</p>
     <p v-if="store.error" class="error-box" role="alert">{{ store.error }}</p>
+    <p v-if="store.savedAt && !store.replay" class="replay-note small">Saved report from {{ store.savedAt.slice(0, 10) }}. Data is as Cala knew it then; run a new forecast for fresh numbers.</p>
 
     <ProgressPanel />
 

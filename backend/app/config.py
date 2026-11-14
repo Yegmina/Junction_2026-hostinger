@@ -12,6 +12,8 @@ class Settings:
     openai_model: str
     gemini_api_key: str | None
     gemini_model: str
+    gemini_fallback_model: str
+    access_code: str | None
     request_timeout_seconds: float
     rate_limit_per_hour: int
     cors_origins: tuple[str, ...]
@@ -36,6 +38,8 @@ def get_settings() -> Settings:
         openai_model=os.getenv("OPENAI_MODEL") or "gpt-5.5",
         gemini_api_key=os.getenv("GEMINI_API_KEY") or None,
         gemini_model=os.getenv("GEMINI_MODEL") or "gemini-flash-latest",
+        gemini_fallback_model=os.getenv("GEMINI_FALLBACK_MODEL") or "gemini-flash-lite-latest",
+        access_code=os.getenv("ACCESS_CODE") or None,
         request_timeout_seconds=float(os.getenv("REQUEST_TIMEOUT_SECONDS") or 120),
         rate_limit_per_hour=int(os.getenv("RATE_LIMIT_PER_HOUR") or 30),
         cors_origins=tuple(o.strip() for o in origins.split(",") if o.strip()),

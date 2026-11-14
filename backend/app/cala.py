@@ -12,6 +12,7 @@ from typing import Any, AsyncIterator
 
 import httpx
 
+from app.calahttp import cala_request
 from app.config import Settings
 from app.models import Evidence, Source, StartupProfile
 
@@ -29,23 +30,14 @@ class CalaClient:
 
     async def search(self, text: str) -> dict[str, Any]:
         """Natural-language answer with sourced context facts (POST /v1/knowledge/search)."""
-        response = await self._client.post(
-            f"{self._base}/v1/knowledge/search",
-            headers=self._headers,
-            json={"input": text, "explainability": False, "return_entities": True},
-        )
-        response.raise_for_status()
-        return response.json()
+        return await cala_request(self._client, "POST", f"{self._base}/v1/knowledge/search", kind="search",
+                                  headers=self._headers,
+                                  body={"input": text, "explainability": False, "return_entities": True})
 
     async def query(self, text: str) -> dict[str, Any]:
         """Structured rows (POST /v1/knowledge/query)."""
-        response = await self._client.post(
-            f"{self._base}/v1/knowledge/query",
-            headers=self._headers,
-            json={"input": text, "return_entities": True},
-        )
-        response.raise_for_status()
-        return response.json()
+        return await cala_request(self._client, "POST", f"{self._base}/v1/knowledge/query", kind="query",
+                                  headers=self._headers, body={"input": text, "return_entities": True})
 
 
 @dataclass
@@ -56,14 +48,19 @@ class EvidenceBundle:
     errors: list[str] = field(default_factory=list)
     mode: str = "cala"
 
-    def add(self, kind: str, text: str, sources: list[Source], limit: int = MAX_TEXT, title: str = "") -> None:
+    def add(self, kind: str, text: str, sources: list[Source], limit: int = MAX_TEXT, title: str = "") -> str | None:
+        """Append a fact and return its id (or the id of an identical existing fact)."""
         text = " ".join(str(text).split())[:limit]
-        if not text or any(item.text == text for item in self.evidence):
-            return
+        if not text:
+            return None
+        existing = next((item.id for item in self.evidence if item.text == text), None)
+        if existing:
+            return existing
         title = title or _title_from(text, sources)
         self.evidence.append(
             Evidence(id=f"E{len(self.evidence) + 1}", kind=kind, title=title, text=text, sources=sources)
         )
+        return self.evidence[-1].id
 
 
 def _clip(text: str, limit: int = 110) -> str:

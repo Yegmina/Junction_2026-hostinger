@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import time
@@ -7,7 +8,7 @@ from collections import defaultdict, deque
 from typing import Annotated, AsyncIterator
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -15,6 +16,7 @@ from app.config import Settings, get_settings
 from app.examples import find_example, list_examples, replay
 from app.models import StartupProfile
 from app.pipeline import run_analysis
+from app.runs import load_run, save_run
 
 log = logging.getLogger("unicorn_oracle")
 settings_at_start = get_settings()
@@ -24,7 +26,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=list(settings_at_start.cors_origins),
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "X-Access-Code"],
 )
 
 _hits: dict[str, deque[float]] = defaultdict(deque)
@@ -46,7 +48,16 @@ def _rate_limit(request: Request, settings: Settings) -> None:
 
 @app.get("/api/health")
 async def health(settings: Annotated[Settings, Depends(get_settings)]):
-    return {"status": "ok", "dataMode": settings.data_mode, "analysisMode": settings.analysis_mode}
+    return {"status": "ok", "dataMode": settings.data_mode, "analysisMode": settings.analysis_mode,
+            "accessCodeRequired": bool(settings.access_code)}
+
+
+@app.get("/api/runs/{run_id}")
+async def get_run(run_id: str):
+    run = load_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return run
 
 
 @app.get("/api/examples")
@@ -61,7 +72,12 @@ def _sse(event: dict) -> str:
 async def _stream(settings: Settings, profile: StartupProfile, example: dict | None = None) -> AsyncIterator[str]:
     try:
         events = replay(example) if example else run_analysis(settings, profile)
+        recorded: list[dict] = []
         async for event in events:
+            recorded.append(event)
+            if event.get("type") == "done":
+                # Save before announcing done, so the share link works as soon as the UI shows it.
+                save_run(event.get("runId", ""), profile.model_dump(), recorded)
             yield _sse(event)
     except httpx.HTTPStatusError as exc:
         host = exc.request.url.host
@@ -80,10 +96,13 @@ async def analyze(
     profile: StartupProfile,
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
+    x_access_code: Annotated[str | None, Header()] = None,
 ):
     # Unedited example profiles replay a recorded real run; anything else runs live.
     example = find_example(profile)
     if not example:
+        if settings.access_code and not hmac.compare_digest((x_access_code or "").encode(), settings.access_code.encode()):
+            raise HTTPException(status_code=401, detail="access_code_required")
         _rate_limit(request, settings)
     return StreamingResponse(
         _stream(settings, profile, example),

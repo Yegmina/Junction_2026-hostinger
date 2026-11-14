@@ -1,0 +1,25 @@
+# HTTPS overlay: Caddy terminates TLS with an automatic Let's Encrypt certificate.
+#   DOMAIN=oracle.example.com docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
+# Without a domain, an sslip.io name that resolves to the server IP works, e.g. 93-127-213-190.sslip.io.
+services:
+  frontend:
+    ports: !reset []
+
+  caddy:
+    image: caddy:2.8-alpine
+    depends_on:
+      - frontend
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN to the public hostname}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

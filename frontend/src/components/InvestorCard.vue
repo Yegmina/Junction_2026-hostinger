@@ -1,6 +1,7 @@
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { pct } from "../store.js";
+import { copyText, introEmail } from "../share.js";
 import CiteChips from "./CiteChips.vue";
 
 const props = defineProps({ target: { type: Object, required: true }, rank: Number, compact: Boolean });
@@ -21,6 +22,17 @@ const activity = computed(() => {
   if (v.value.latestDeal) parts.push(`latest ${v.value.latestDeal}`);
   return parts.join(" · ");
 });
+const ticket = computed(() => (v.value?.ticket && v.value.ticket.match !== "unknown" ? v.value.ticket : null));
+const ticketIcon = { yes: "✓", partial: "≈", no: "✕", unknown: "?" };
+const intros = computed(() => (v.value?.introPaths || []).slice(0, props.compact ? 1 : 3));
+
+const showEmail = ref(false);
+const copied = ref(false);
+const email = computed(() => introEmail(props.target));
+async function copyEmail() {
+  copied.value = await copyText(`Subject: ${email.value.subject}\n\n${email.value.body}`);
+  setTimeout(() => (copied.value = false), 1800);
+}
 </script>
 
 <template>
@@ -45,13 +57,34 @@ const activity = computed(() => {
         Possible link to {{ softConflicts.map((c) => c.company).join(", ") }}: named together in
         <CiteChips :ids="[...new Set(softConflicts.map((c) => c.evidence).filter(Boolean))]" />. Check before pitching.
       </p>
+      <p v-if="ticket" :class="['ticket', ticket.match]" :title="`${ticket.rounds} rounds in the Cala graph`">
+        <span class="ticon">{{ ticketIcon[ticket.match] }}</span>{{ ticket.text }}
+      </p>
       <p class="why">{{ target.why }}</p>
+      <div v-if="intros.length" class="intros">
+        <span class="muted small">Warm intro via</span>
+        <span v-for="x in intros" :key="x.person" class="intro">
+          <b>{{ x.person }}</b>, {{ x.role }} of {{ x.company }}
+        </span>
+        <small class="muted">(portfolio company, Cala graph)</small>
+      </div>
       <p v-if="portfolio.length" class="portfolio">
         <span class="muted small">Portfolio:</span>
         <span v-for="p in portfolio" :key="p" class="pchip">{{ p }}</span>
         <span v-if="more" class="muted small">{{ more }}</span>
       </p>
       <CiteChips :ids="compact ? target.evidence.slice(0, 3) : target.evidence" />
+      <template v-if="!compact && v">
+        <button type="button" class="link email-toggle" @click="showEmail = !showEmail">
+          {{ showEmail ? "Hide draft" : intros.length ? "✉ Draft intro request" : "✉ Draft cold email" }}</button>
+        <Transition name="fold">
+          <div v-if="showEmail" class="email">
+            <p class="small"><span class="muted">To:</span> {{ email.to }}<br /><span class="muted">Subject:</span> {{ email.subject }}</p>
+            <pre>{{ email.body }}</pre>
+            <button type="button" class="ghost small-btn" @click="copyEmail">{{ copied ? "Copied ✓" : "Copy email" }}</button>
+          </div>
+        </Transition>
+      </template>
     </div>
   </article>
 </template>

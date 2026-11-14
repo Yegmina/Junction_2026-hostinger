@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import { cancelAnalysis, clock, derived, store } from "../store.js";
+import UsageLine from "./UsageLine.vue";
 
 const expanded = ref(false);
 const progress = computed(() => (store.steps.length ? derived.doneSteps / store.steps.length : 0));
@@ -33,6 +34,7 @@ const showDetail = computed(() => store.running || expanded.value);
           {{ derived.doneSteps }}/{{ store.steps.length }} steps · {{ store.evidence.length }} sourced facts ·
           {{ derived.sourceCount }} sources
         </p>
+        <UsageLine />
       </div>
       <div class="progress-actions">
         <span v-if="store.running" class="clock">{{ clock(derived.elapsed) }}</span>

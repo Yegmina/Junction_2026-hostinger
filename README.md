@@ -18,9 +18,19 @@ Every claim in the UI has clickable evidence chips that jump to the source fact.
 | Structured query (Cala QL) | `POST /v1/knowledge/query` | Top-funded companies in the sector with rounds and investors |
 | Entity mentions | `entities` in search answers | Exact graph ids for the competitors Cala found |
 | Entity search + introspection | `GET /v1/entities`, `GET /v1/entities/{id}/introspection` | Resolve each shortlisted investor to its graph entity and check which relationships exist |
-| Graph traversal | `POST /v1/entities/{id}` | `INVESTED_IN` edges into competitors (who backs them), each investor's portfolio, and `PARTICIPATES_IN_FUNDING_ROUND` → round `announcement_date` to prove they are still active |
+| Graph traversal | `POST /v1/entities/{id}` | `INVESTED_IN` edges into competitors (who backs them), each investor's portfolio, and `PARTICIPATES_IN_FUNDING_ROUND` → round `announcement_date`, `round_label` and `transaction_value` |
+| People in the graph | `FOUNDED`, `IS_CEO_OF`, `IS_CTO_OF` into portfolio companies | Warm intro paths: founders who already took this investor's money |
 
-From this the app flags **conflicts of interest** (an investor that backs a direct competitor, from the graph or sourced text), marks each lead **Verified in Cala graph** with portfolio size and latest deal date, and ranks conflict-free, verified leads first.
+From this the app:
+
+- flags **conflicts of interest** (an investor that backs a direct competitor, from the graph or sourced text);
+- marks each lead **Verified in Cala graph** with portfolio size and latest deal date;
+- checks the **ticket size**: which stages and round sizes the investor has joined versus your raise;
+- suggests **warm intros** ("Ask Ruben Bryon, founder of Verda, a portfolio company");
+- draws your market as a graph: you → competitors → their backers, with shortlisted leads highlighted;
+- ranks conflict-free, verified, right-sized leads first.
+
+Every report ends with a usage line ("N knowledge searches · N structured queries · N entity lookups · N graph relationships"), counted per run.
 
 ## Example replays
 
@@ -62,6 +72,16 @@ npm install
 npm run dev                    # http://127.0.0.1:5173, proxies /api to :8000
 ```
 
+Run over HTTPS with an automatic Let's Encrypt certificate (Caddy in front):
+
+```bash
+DOMAIN=oracle.example.com docker compose -f docker-compose.yml -f docker-compose.https.yml up --build -d
+```
+
+Without a domain, use an sslip.io name for the server IP, e.g. `DOMAIN=93-127-213-190.sslip.io`.
+
+Saved reports and the 24 h Cala response cache live in the `oracle_data` volume.
+
 ## Tests
 
 ```bash
@@ -70,12 +90,16 @@ cd backend && .venv/bin/python -m pytest -q
 
 ## API
 
-- `GET /api/health` returns `{"dataMode": "cala"|"demo", "analysisMode": "openai"|"gemini"|"demo"}`.
-- `POST /api/analyze` takes a startup profile (`name`, `description`, `sector`, `country`, `stage`, `targetAmountEur`, `horizonMonths`). It streams server-sent events of these types: `start`, `status`, `evidence`, `plan`, `committee`, `done` and `error`.
+- `GET /api/health` returns `{"dataMode": "cala"|"demo", "analysisMode": "openai"|"gemini"|"demo", "accessCodeRequired": bool}`.
+- `POST /api/analyze` takes a startup profile (`name`, `description`, `sector`, `country`, `stage`, `targetAmountEur`, `horizonMonths`). It streams server-sent events: `start`, `steps`, `step`, `evidence`, `graph`, `plan`, `committee`, `usage`, `done` and `error`. Scenarios and the investor shortlist are built concurrently, so the shortlist usually arrives first.
+- `GET /api/runs/{runId}` returns a finished report (profile plus its events). The UI opens it at `/r/{runId}`.
 
 ## Safety for a public demo
 
 - Requests are rate-limited per IP (`RATE_LIMIT_PER_HOUR`).
+- Set `ACCESS_CODE` to make live runs invite-only (sent as `X-Access-Code`); example replays and saved reports stay public.
+- Gemini calls retry once on 429/5xx/timeouts, then fall back to `GEMINI_FALLBACK_MODEL` (default `gemini-flash-lite-latest`).
+- Cala responses are cached on disk for 24 h, so repeated runs are faster and cheaper.
 - Users cannot pass URLs to the server.
 - Inputs are length-limited.
 - CORS is restricted to configured origins.

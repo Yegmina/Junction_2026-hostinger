@@ -1,6 +1,7 @@
 """LLM calls with strict JSON schemas: Gemini (generateContent) or OpenAI (Responses API)."""
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -139,7 +140,30 @@ async def structured_call(
     return await _openai_call(settings, system, payload, name, schema)
 
 
+RETRYABLE = {429, 500, 502, 503, 504}
+
+
 async def _gemini_call(settings: Settings, system: str, payload: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
+    """Primary model, one retry, then the fallback model; invalid JSON also triggers the fallback."""
+    attempts = [settings.gemini_model, settings.gemini_model, settings.gemini_fallback_model]
+    last_error: Exception | None = None
+    for index, model in enumerate(attempts):
+        try:
+            return await _gemini_once(settings, model, system, payload, schema)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code not in RETRYABLE:
+                raise
+            last_error = exc
+        except (httpx.TimeoutException, httpx.TransportError, ValueError) as exc:
+            last_error = exc
+        if index == 0:
+            await asyncio.sleep(1.5)
+    raise last_error or ValueError("Gemini call failed")
+
+
+async def _gemini_once(
+    settings: Settings, model: str, system: str, payload: dict[str, Any], schema: dict[str, Any]
+) -> dict[str, Any]:
     body = {
         "systemInstruction": {"parts": [{"text": system}]},
         "contents": [{"role": "user", "parts": [{"text": json.dumps(payload, ensure_ascii=False)}]}],
@@ -150,7 +174,7 @@ async def _gemini_call(settings: Settings, system: str, payload: dict[str, Any],
             "temperature": 0.0,
         },
     }
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
         response = await client.post(url, headers={"x-goog-api-key": settings.gemini_api_key or ""}, json=body)
         response.raise_for_status()

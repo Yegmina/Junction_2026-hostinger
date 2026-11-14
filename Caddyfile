@@ -1,0 +1,13 @@
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy frontend:80 {
+		header_up X-Real-IP {remote_host}
+		# Analysis results stream as server-sent events; flush every chunk immediately.
+		flush_interval -1
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}

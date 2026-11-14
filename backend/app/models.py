@@ -106,6 +106,21 @@ class Conflict(BaseModel):
     evidence: str | None = None
 
 
+class IntroPath(BaseModel):
+    person: str
+    role: Literal["founder", "CEO", "CTO", "board member"]
+    company: str
+
+
+class TicketMatch(BaseModel):
+    stages: list[str] = Field(default_factory=list)
+    minEur: float | None = None
+    maxEur: float | None = None
+    rounds: int = 0
+    match: Literal["yes", "partial", "no", "unknown"] = "unknown"
+    text: str = ""
+
+
 class InvestorVerification(BaseModel):
     verified: bool
     entityId: str | None = None
@@ -117,6 +132,8 @@ class InvestorVerification(BaseModel):
     recentDeals: int = 0
     latestDeal: str = ""
     conflicts: list[Conflict] = Field(default_factory=list)
+    introPaths: list[IntroPath] = Field(default_factory=list)
+    ticket: TicketMatch | None = None
 
 
 class InvestorTarget(BaseModel):

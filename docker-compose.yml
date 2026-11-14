@@ -6,6 +6,8 @@ services:
         required: false
     expose:
       - "8000"
+    volumes:
+      - oracle_data:/data  # saved reports (/r/<id>) and the 24 h Cala cache
     restart: unless-stopped
 
   frontend:
@@ -15,3 +17,6 @@ services:
     ports:
       - "${WEB_PORT:-8080}:80"
     restart: unless-stopped
+
+volumes:
+  oracle_data:

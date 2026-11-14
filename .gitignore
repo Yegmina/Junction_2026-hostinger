@@ -6,3 +6,4 @@ node_modules/
 dist/
 *.pid
 *.log
+backend/data/

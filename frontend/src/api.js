@@ -5,16 +5,24 @@ export async function health() {
   return res.json();
 }
 
+export async function getRun(runId) {
+  const res = await fetch(`${API_BASE}/api/runs/${encodeURIComponent(runId)}`);
+  if (!res.ok) throw new Error(res.status === 404 ? "This report link does not exist (or has expired)." : `Request failed with status ${res.status}`);
+  return res.json();
+}
+
 export async function examples() {
   const res = await fetch(`${API_BASE}/api/examples`);
   return res.json();
 }
 
 // Streams server-sent events from POST /api/analyze and calls onEvent for each one.
-export async function analyze(profile, onEvent, signal) {
+export async function analyze(profile, onEvent, signal, accessCode = "") {
+  const headers = { "Content-Type": "application/json" };
+  if (accessCode) headers["X-Access-Code"] = accessCode;
   const res = await fetch(`${API_BASE}/api/analyze`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(profile),
     signal,
   });
@@ -23,7 +31,10 @@ export async function analyze(profile, onEvent, signal) {
     const detail = Array.isArray(body.detail)
       ? body.detail.map((d) => `${d.loc?.slice(-1)[0]}: ${d.msg}`).join("; ")
       : body.detail;
-    throw new Error(detail || `Request failed with status ${res.status}`);
+    const error = new Error(detail || `Request failed with status ${res.status}`);
+    error.status = res.status;
+    error.detail = body.detail;
+    throw error;
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
