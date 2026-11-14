@@ -325,7 +325,7 @@ async def run_analysis(settings: Settings, profile: StartupProfile) -> AsyncIter
             sites = sum(1 for t in targets if t.web and t.web.website)
             news = sum(len(t.web.news) for t in targets if t.web)
             await queue.put({"type": "step", "id": "web:investors", "state": "done", "seconds": seconds,
-                             "detail": f"{sites} websites, {news} recent articles"})
+                             "detail": f"{sites} websites" + (f", {news} recent articles" if settings.oxylabs_api_key else "")})
             await queue.put(_evidence_event(bundle))
             await queue.put({"type": "committee", "committee": committee.model_dump()})
 

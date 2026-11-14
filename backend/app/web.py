@@ -41,10 +41,10 @@ def _cached(method: str, url: str, body: Any) -> Any | None:
 
 
 async def _post(http: httpx.AsyncClient, url: str, key: str, body: dict[str, Any], counter: str) -> Any:
+    count_web(counter)  # counted like Cala: every call the report used, cached or not
     cached = _cached("POST", url, body)
     if cached is not None:
         return cached
-    count_web(counter)
     response = await http.post(url, json=body, timeout=CALL_TIMEOUT,
                                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
     response.raise_for_status()
@@ -85,6 +85,33 @@ def pick_sentences(text: str, must: list[str], prefer: list[str], limit: int = 2
         if must_l and not any(m in low for m in must_l):
             continue
         scored.append((sum(p in low for p in prefer_l), -index, sentence))
+    scored.sort(reverse=True)
+    return " ".join(s for _, _, s in scored[:limit])[:500]
+
+
+DATE = re.compile(r"\b(20(2[3-9])|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b", re.I)
+AMOUNT = re.compile(r"(€|\$|£|\bEUR\b|\bUSD\b)\s?\d|\d+(\.\d+)?\s?(m|million|k|bn)\b", re.I)
+DEAL = ("led", "leads", "co-led", "participated", "backed", "invested", "raised", "round", "seed", "series")
+BOILERPLATE = ("every venture round", "cookie", "subscribe", "sign up", "our funding reports cover")
+
+
+def deal_sentences(text: str, name: str, topic: list[str], about_page: bool = False, limit: int = 2) -> str:
+    """Sentences about the investor's deals, ranked: dated or sized first, then deal words, then topic.
+
+    Only sentences with a date or an amount qualify. On a page whose title names the investor
+    (a deal dashboard), sentences need not repeat the name."""
+    scored = []
+    for index, sentence in enumerate(sentences(text)):
+        low = sentence.lower()
+        if any(b in low for b in BOILERPLATE) or not (DATE.search(sentence) or AMOUNT.search(sentence)):
+            continue
+        names_it = name.lower() in low
+        deal_words = sum(w in low for w in DEAL)
+        if not names_it and not (about_page and deal_words):
+            continue
+        score = (3 * bool(DATE.search(sentence)) + 3 * bool(AMOUNT.search(sentence)) + 2 * names_it
+                 + deal_words + sum(t in low for t in topic if len(t) > 3))
+        scored.append((score, -index, sentence))
     scored.sort(reverse=True)
     return " ".join(s for _, _, s in scored[:limit])[:500]
 
@@ -249,25 +276,35 @@ async def oxy_scrape(http: httpx.AsyncClient, key: str, url: str) -> str:
 SKIP_DOMAINS = ("linkedin.com", "facebook.com", "x.com", "twitter.com", "instagram.com", "youtube.com")
 
 
+def _outline(result: dict[str, Any]) -> str:
+    outline = result.get("outline")
+    if isinstance(outline, list):
+        outline = " ".join(str(o) for o in outline)
+    return clean_markdown(str(outline or ""))
+
+
 async def investor_news(http: httpx.AsyncClient, key: str, investor: str, profile: StartupProfile,
                         bundle: EvidenceBundle, web: InvestorWeb) -> None:
-    """Search the live web for the investor's latest deals, then scrape and quote the best article."""
+    """Oxylabs search-to-scrape: find third-party coverage of the investor's recent deals, read the page,
+    quote the sentences that name it. The investor's own site is skipped (Context.dev covers it)."""
     short = _short_name(investor)
-    year = date.today().year
-    query = f"\"{short}\" invests {profile.sector} {year}"
-    results = await oxy_search(http, key, query)
+    own = _norm(short)
+    query = f"\"{short}\" led {profile.stage.replace('-', ' ')} round {date.today().year}"
+    results = await oxy_search(http, key, query, max_results=8)
     candidates = [r for r in results
-                  if short.lower() in f"{r.get('title', '')} {r.get('outline', '')}".lower()
+                  if short.lower() in f"{r.get('title', '')} {_outline(r)}".lower()
+                  and own not in _norm(domain_of(r["url"]))
                   and not any(d in domain_of(r["url"]) for d in SKIP_DOMAINS)]
     for result in candidates[:2]:
+        page = ""
         try:
             page = await oxy_scrape(http, key, result["url"])
         except (httpx.HTTPError, ValueError) as exc:
             web.errors.append(f"Oxylabs scrape of {domain_of(result['url'])}: {_reason(exc)}")
-            continue
-        quote = pick_sentences(page, [short], _profile_words(profile) + ["led", "round", "invest", "seed", "funding"])
-        if not quote:
-            quote = clean_markdown(str(result.get("outline") or ""))[:300]
+        about_page = short.lower() in str(result.get("title") or "").lower()
+        quote = deal_sentences(page, short, _profile_words(profile), about_page=about_page)
+        if not quote:  # the search snippet, if it reports a dated or sized deal
+            quote = deal_sentences(_outline(result), short, _profile_words(profile), about_page=about_page)
         if not quote:
             continue
         title = clean_markdown(str(result.get("title") or domain_of(result["url"])))[:140]
@@ -275,10 +312,8 @@ async def investor_news(http: httpx.AsyncClient, key: str, investor: str, profil
                          [Source(name=f"{title} (via Oxylabs)", url=result["url"])],
                          title=f"{short} on the web: {title}")
         web.news.append(WebItem(title=title, url=result["url"], snippet=quote[:300], evidenceId=eid))
-        if len(web.news) >= 1:
-            return
-    if not candidates:
-        web.errors.append(f"Oxylabs search found no recent article naming {short}")
+        return
+    web.errors.append(f"Oxylabs search found no third-party article naming {short}")
 
 
 async def investor_site(http: httpx.AsyncClient, key: str, investor: str, profile: StartupProfile,

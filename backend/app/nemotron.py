@@ -40,6 +40,8 @@ AUDIT_PROMPT = (
     "investor decide: 'supported' (evidence shows it invests at this stage and sector, recently, with no "
     "conflict), 'weak' (plausible but thin, old or indirect evidence), or 'contradicted' (evidence shows a "
     "conflict with a competitor, the wrong stage or sector, or the cited facts do not concern this investor). "
+    "The founder raises an equity round: a grant agency, public funding body or lender that does not take equity "
+    "cannot lead it, so rate such a body 'weak' at best and say it is non-dilutive. "
     "Give a reason of at most 25 words naming the decisive fact, and the evidence ids you relied on. Then a "
     "'summary' of at most 30 words: which investor to pitch first and why. Use only the provided evidence. "
     "Return ONLY a JSON object of this shape, no markdown: "

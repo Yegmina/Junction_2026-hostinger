@@ -59,3 +59,18 @@ def test_audit_moves_contradicted_leads_last(monkeypatch):
     assert out.investorTargets[1].audit.verdict == "contradicted"
     assert out.investorTargets[1].audit.evidence == ["E1"]  # unknown ids dropped
     assert out.auditSummary == "Pitch Lifeline first."
+
+
+def test_deal_sentences_prefer_dated_sized_deals():
+    from app.web import deal_sentences
+    page = ("Every venture round since January 2024 in which public sources name Acme Capital as an investor.\n"
+            "Acme Capital is an investor based in Helsinki with a broad mandate.\n"
+            "In March 2026 Acme Capital led a €3M seed round in Verdi, a climate software startup.")
+    assert deal_sentences(page, "Acme Capital", ["climate"]).startswith("In March 2026 Acme Capital led")
+
+
+def test_deal_dashboard_sentences_count_only_on_pages_about_the_investor():
+    from app.web import deal_sentences
+    page = "# 2C Ventures\n4 venture rounds in the first 9 months of 2026, at 4 companies in 2 countries.\nRounds in 2025"
+    assert deal_sentences(page, "2C Ventures", [], about_page=True).startswith("4 venture rounds")
+    assert deal_sentences(page, "2C Ventures", [], about_page=False) == ""
