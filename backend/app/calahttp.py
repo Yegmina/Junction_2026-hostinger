@@ -32,6 +32,10 @@ class CalaUsage:
     entityLookups: int = 0
     relationships: int = 0
     cached: int = 0
+    webSearches: int = 0  # Oxylabs /v1/search
+    webScrapes: int = 0  # Oxylabs /v1/scrape
+    contextDev: int = 0  # Context.dev calls
+    nemotron: int = 0  # NVIDIA Nemotron calls
 
     def as_dict(self) -> dict[str, int]:
         return asdict(self)
@@ -44,6 +48,13 @@ def start_usage() -> CalaUsage:
     usage = CalaUsage()
     _usage.set(usage)
     return usage
+
+
+def count_web(field_name: str) -> None:
+    """Count a non-Cala call (Oxylabs, Context.dev, Nemotron) for this run."""
+    usage = _usage.get()
+    if usage is not None:
+        setattr(usage, field_name, getattr(usage, field_name) + 1)
 
 
 def _count(kind: str, payload: Any) -> None:

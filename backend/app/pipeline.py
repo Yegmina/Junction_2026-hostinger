@@ -12,7 +12,9 @@ from app.calahttp import start_usage
 from app.config import Settings
 from app.demo import demo_committee, demo_plan
 from app.llm import PESTEL_ENUM, COMMITTEE_PROMPT, COMMITTEE_SCHEMA, PLAN_PROMPT, PLAN_SCHEMA, structured_call
-from app.verification import CompetitorMap, add_competitor_facts, map_competitors, verify_targets
+from app.nemotron import audit_shortlist
+from app.verification import CompetitorMap, add_competitor_facts, competitor_entities, map_competitors, verify_targets
+from app.web import check_investors, competitor_profiles
 from app.models import (
     Axis,
     Committee,
@@ -185,6 +187,19 @@ async def run_analysis(settings: Settings, profile: StartupProfile) -> AsyncIter
     if live_graph:
         steps.append({"id": "graph:investors", "group": "Cala graph",
                       "label": "Verify shortlist: portfolio, round sizes, warm intros, conflicts"})
+    web_competitors = bool(settings.context_dev_api_key) and settings.analysis_mode != "demo"
+    web_investors = bool(settings.context_dev_api_key or settings.oxylabs_api_key) and settings.analysis_mode != "demo"
+    auditing = bool(settings.nvidia_api_key) and settings.analysis_mode != "demo"
+    if web_competitors:
+        steps.insert(len(QUERY_LABELS), {"id": "web:competitors", "group": "Live web",
+                                         "label": "Competitor profiles from their websites (Context.dev)"})
+    if web_investors:
+        providers = " + ".join(p for p, k in (("Context.dev", settings.context_dev_api_key),
+                                               ("Oxylabs", settings.oxylabs_api_key)) if k)
+        steps.append({"id": "web:investors", "group": "Live web",
+                      "label": f"Investor websites and latest deals ({providers})"})
+    if auditing:
+        steps.append({"id": "audit", "group": "NVIDIA Nemotron", "label": "Independent audit of the shortlist"})
     yield {"type": "steps", "steps": steps}
     for kind in QUERY_LABELS:
         yield {"type": "step", "id": f"cala:{kind}", "state": "running"}
@@ -235,6 +250,12 @@ async def run_analysis(settings: Settings, profile: StartupProfile) -> AsyncIter
 
     async def shortlist_lane() -> None:
         cmap = CompetitorMap()
+        web_task = None
+        if web_competitors:
+            names = [c.name for c in competitor_entities(bundle, profile)]
+            await queue.put({"type": "step", "id": "web:competitors", "state": "running",
+                             "detail": f"looking up {min(len(names), 5)} competitors"})
+            web_task = asyncio.create_task(_timed(competitor_profiles(settings, names, bundle)))
         if live_graph:
             await queue.put({"type": "step", "id": "graph:competitors", "state": "running",
                              "detail": "following INVESTED_IN edges"})
@@ -246,6 +267,14 @@ async def run_analysis(settings: Settings, profile: StartupProfile) -> AsyncIter
                              "seconds": round(time.monotonic() - started, 1),
                              "detail": f"{linked} of {len(cmap.competitors)} competitors with known backers"})
             await queue.put({"type": "graph", "competitors": cmap.as_payload()})
+            await queue.put(_evidence_event(bundle))
+        if web_task:
+            summary, seconds = await web_task
+            detail = f"{summary['found']} of {summary['tried']} found"
+            if summary["errors"] and not summary["found"]:
+                detail += f" ({summary['errors'][0]})"
+            await queue.put({"type": "step", "id": "web:competitors", "state": "done", "seconds": seconds,
+                             "detail": detail})
             await queue.put(_evidence_event(bundle))
 
         await queue.put({"type": "step", "id": "committee", "state": "running", "detail": "three partners debating"})
@@ -262,11 +291,21 @@ async def run_analysis(settings: Settings, profile: StartupProfile) -> AsyncIter
                          "detail": f"{len(committee.investorTargets)} investors shortlisted"})
         await queue.put({"type": "committee", "committee": committee.model_dump()})
 
+        web_check = None
+        if web_investors and committee.investorTargets:
+            await queue.put({"type": "step", "id": "web:investors", "state": "running",
+                             "detail": f"searching and scraping for {len(committee.investorTargets)} investors"})
+            web_check = asyncio.create_task(_timed(check_investors(settings, committee.investorTargets, profile, bundle)))
         if live_graph:
             await queue.put({"type": "step", "id": "graph:investors", "state": "running",
                              "detail": f"checking {len(committee.investorTargets)} investors"})
             started = time.monotonic()
             targets = await verify_targets(settings, committee.investorTargets, cmap, bundle, profile)
+            if web_check:
+                webbed, _ = await web_check
+                by_name = {t.name: t for t in webbed}
+                targets = [t.model_copy(update={"web": by_name[t.name].web, "evidence": by_name[t.name].evidence})
+                           if t.name in by_name else t for t in targets]
             committee = committee.model_copy(update={"investorTargets": targets})
             verified = sum(1 for t in targets if t.verification and t.verification.verified)
             intros = sum(len(t.verification.introPaths) for t in targets if t.verification)
@@ -276,6 +315,34 @@ async def run_analysis(settings: Settings, profile: StartupProfile) -> AsyncIter
                              "detail": f"{verified} verified, {intros} intro paths, {conflicted} with conflicts"})
             await queue.put(_evidence_event(bundle))
             await queue.put({"type": "committee", "committee": committee.model_dump()})
+        elif web_check:
+            webbed, _ = await web_check
+            committee = committee.model_copy(update={"investorTargets": webbed})
+        if web_check:
+            _, seconds = await web_check
+            targets = committee.investorTargets
+            sites = sum(1 for t in targets if t.web and t.web.website)
+            news = sum(len(t.web.news) for t in targets if t.web)
+            await queue.put({"type": "step", "id": "web:investors", "state": "done", "seconds": seconds,
+                             "detail": f"{sites} websites, {news} recent articles"})
+            await queue.put(_evidence_event(bundle))
+            await queue.put({"type": "committee", "committee": committee.model_dump()})
+
+        if auditing and committee.investorTargets:
+            await queue.put({"type": "step", "id": "audit", "state": "running",
+                             "detail": f"{settings.nemotron_model.split('/')[-1]} reviewing {len(committee.investorTargets)} leads"})
+            started = time.monotonic()
+            try:
+                committee = await audit_shortlist(settings, profile, committee, bundle)
+                verdicts = [t.audit.verdict for t in committee.investorTargets if t.audit]
+                detail = ", ".join(f"{verdicts.count(v)} {v}" for v in ("supported", "weak", "contradicted") if verdicts.count(v))
+                await queue.put({"type": "step", "id": "audit", "state": "done",
+                                 "seconds": round(time.monotonic() - started, 1), "detail": detail or "no verdicts"})
+                await queue.put({"type": "committee", "committee": committee.model_dump()})
+            except Exception as exc:  # the audit is a second opinion: never lose the report over it
+                await queue.put({"type": "step", "id": "audit", "state": "failed",
+                                 "seconds": round(time.monotonic() - started, 1),
+                                 "detail": f"audit unavailable ({type(exc).__name__}), shortlist unchanged"})
 
     async def lane(coro) -> None:
         try:
@@ -301,6 +368,12 @@ async def run_analysis(settings: Settings, profile: StartupProfile) -> AsyncIter
 
     yield {"type": "usage", "usage": usage.as_dict()}
     yield {"type": "done", "runId": run_id, "seconds": round(time.monotonic() - run_started, 1)}
+
+
+async def _timed(coro):
+    started = time.monotonic()
+    result = await coro
+    return result, round(time.monotonic() - started, 1)
 
 
 def _evidence_event(bundle: EvidenceBundle) -> dict[str, Any]:

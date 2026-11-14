@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from "vue";
-import { pct } from "../store.js";
+import { domainOf, pct } from "../store.js";
 import { copyText, introEmail } from "../share.js";
 import CiteChips from "./CiteChips.vue";
 
@@ -24,6 +24,11 @@ const activity = computed(() => {
 });
 const ticket = computed(() => (v.value?.ticket && v.value.ticket.match !== "unknown" ? v.value.ticket : null));
 const ticketIcon = { yes: "✓", partial: "≈", no: "✕", unknown: "?" };
+const web = computed(() => props.target.web);
+const news = computed(() => (web.value?.news || []).slice(0, 1));
+const audit = computed(() => props.target.audit);
+const auditLabel = { supported: "✓ Supported", weak: "≈ Weak evidence", contradicted: "✕ Contradicted" };
+const logoOk = ref(true);
 const intros = computed(() => (v.value?.introPaths || []).slice(0, props.compact ? 1 : 3));
 
 const showEmail = ref(false);
@@ -40,7 +45,11 @@ async function copyEmail() {
     <span v-if="rank" class="rank">#{{ rank }}</span>
     <div class="inv-body">
       <div class="inv-top">
-        <b>{{ target.name }}</b>
+        <span class="inv-name">
+          <img v-if="web?.logo && logoOk" :src="web.logo" alt="" class="inv-logo" referrerpolicy="no-referrer" @error="logoOk = false" />
+          <b>{{ target.name }}</b>
+          <a v-if="web?.website" :href="web.website" target="_blank" rel="noopener" class="small site-link">{{ domainOf(web.website) }} ↗</a>
+        </span>
         <span class="fit">{{ pct(target.fitScore) }} fit</span>
       </div>
       <div class="fitbar"><span :style="{ width: pct(target.fitScore) }" /></div>
@@ -60,7 +69,21 @@ async function copyEmail() {
       <p v-if="ticket" :class="['ticket', ticket.match]" :title="`${ticket.rounds} rounds in the Cala graph`">
         <span class="ticon">{{ ticketIcon[ticket.match] }}</span>{{ ticket.text }}
       </p>
+      <p v-if="audit" :class="['audit', audit.verdict]">
+        <span class="audit-tag">Nemotron audit: {{ auditLabel[audit.verdict] }}</span>
+        {{ audit.reason }} <CiteChips v-if="!compact" :ids="audit.evidence" />
+      </p>
       <p class="why">{{ target.why }}</p>
+      <p v-if="!compact && web?.focus" class="webline">
+        <span class="muted small">Their stated focus</span> “{{ web.focus }}”
+        <CiteChips :ids="[web.focusEvidenceId].filter(Boolean)" />
+      </p>
+      <p v-for="n in news" :key="n.url" class="webline">
+        <span class="muted small">Latest on the web</span>
+        <a :href="n.url" target="_blank" rel="noopener">{{ n.title }}</a>
+        <small class="muted"> · {{ domainOf(n.url) }}</small>
+        <template v-if="!compact"><br />“{{ n.snippet }}” <CiteChips :ids="[n.evidenceId].filter(Boolean)" /></template>
+      </p>
       <div v-if="intros.length" class="intros">
         <span class="muted small">Warm intro via</span>
         <span v-for="x in intros" :key="x.person" class="intro">

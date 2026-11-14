@@ -41,7 +41,8 @@ def test_cala_request_caches_and_counts():
 
     usage = asyncio.run(go())
     assert len(calls) == 2  # second identical entity call came from the disk cache
-    assert usage.as_dict() == {"searches": 1, "queries": 0, "entityLookups": 2, "relationships": 4, "cached": 1}
+    assert usage.as_dict() == {"searches": 1, "queries": 0, "entityLookups": 2, "relationships": 4, "cached": 1,
+                               "webSearches": 0, "webScrapes": 0, "contextDev": 0, "nemotron": 0}
 
 
 def test_demo_run_reports_usage_and_is_saved_for_sharing():

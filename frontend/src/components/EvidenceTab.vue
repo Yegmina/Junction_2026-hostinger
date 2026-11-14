@@ -21,11 +21,11 @@ const shown = computed(() => {
 <template>
   <section class="card evidence-tab">
     <header class="card-head">
-      <h3>Evidence from {{ store.dataMode === "cala" ? "Cala" : "demo dataset" }}</h3>
+      <h3>Evidence from {{ store.dataMode === "cala" ? (counts.web ? "Cala and the live web" : "Cala") : "demo dataset" }}</h3>
       <input v-model="query" type="search" class="search" placeholder="Search facts" aria-label="Search facts" />
     </header>
     <div class="filters">
-      <button v-for="k in ['all', 'competitor', 'funding', 'investor', 'market', 'graph']" :key="k" type="button"
+      <button v-for="k in ['all', 'competitor', 'funding', 'investor', 'market', 'graph', 'web']" :key="k" type="button"
         :class="['chip', { on: kind === k }]" :disabled="!counts[k]" @click="kind = k">
         {{ k === "all" ? "All" : KIND_LABELS[k] }} <small>{{ counts[k] || 0 }}</small>
       </button>

@@ -47,6 +47,7 @@ export const KIND_LABELS = {
   investor: "Investors",
   market: "Company list",
   graph: "Cala graph",
+  web: "Live web",
 };
 
 export const store = reactive({

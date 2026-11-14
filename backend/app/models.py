@@ -32,7 +32,7 @@ class Source(BaseModel):
 
 class Evidence(BaseModel):
     id: str
-    kind: Literal["competitor", "funding", "investor", "market", "graph"]
+    kind: Literal["competitor", "funding", "investor", "market", "graph", "web"]
     title: str = ""
     text: str
     sources: list[Source] = Field(default_factory=list)
@@ -136,12 +136,40 @@ class InvestorVerification(BaseModel):
     ticket: TicketMatch | None = None
 
 
+class WebItem(BaseModel):
+    title: str
+    url: str
+    snippet: str = ""
+    evidenceId: str | None = None
+
+
+class InvestorWeb(BaseModel):
+    """Live web check: Context.dev company profile and Oxylabs search-to-scrape."""
+    website: str | None = None
+    description: str = ""
+    logo: str | None = None
+    focus: str = ""
+    focusEvidenceId: str | None = None
+    news: list[WebItem] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+
+
+class Audit(BaseModel):
+    """Independent second-model review of one shortlisted investor."""
+    verdict: Literal["supported", "weak", "contradicted"]
+    reason: str
+    evidence: list[str] = Field(default_factory=list)
+    model: str = ""
+
+
 class InvestorTarget(BaseModel):
     name: str
     why: str
     fitScore: float = Field(ge=0, le=1)
     evidence: list[str] = Field(default_factory=list)
     verification: InvestorVerification | None = None
+    web: InvestorWeb | None = None
+    audit: Audit | None = None
 
 
 class Committee(BaseModel):
@@ -149,3 +177,5 @@ class Committee(BaseModel):
     consensus: str
     investorTargets: list[InvestorTarget]
     nextActions: list[str]
+    auditSummary: str = ""
+    auditModel: str = ""

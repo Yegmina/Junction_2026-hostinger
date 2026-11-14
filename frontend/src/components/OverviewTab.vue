@@ -83,6 +83,8 @@ const stanceIcon = { back: "👍", conditional: "🤔", pass: "👎" };
         <button v-if="store.committee" type="button" class="link" @click="store.tab = 'investors'">All leads →</button></header>
       <p v-if="avoid.length" class="avoid small">⚠ Think twice: <span v-for="(a, i) in avoid" :key="a.name"><b>{{ a.name }}</b> backs {{ a.company }}{{ i < avoid.length - 1 ? "; " : "" }}</span>
         <small class="muted"> (Cala graph)</small></p>
+      <p v-if="store.committee?.auditSummary" class="audit-summary small">
+        <span class="audit-tag">Second opinion from NVIDIA Nemotron:</span> {{ store.committee.auditSummary }}</p>
       <div v-if="store.committee" class="lead-row">
         <InvestorCard v-for="(t, i) in store.committee.investorTargets.slice(0, 3)" :key="t.name" :target="t" :rank="i + 1" compact />
         <p v-if="!store.committee.investorTargets.length" class="muted">No investor in the Cala evidence matched well enough.</p>
