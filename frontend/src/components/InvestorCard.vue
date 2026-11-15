@@ -82,7 +82,7 @@ async function copyEmail() {
       </p>
       <p class="why">{{ target.why }}</p>
       <p v-if="seen && !compact" class="seen small">
-        <span class="muted">Seen before</span> Shortlisted in {{ seen.reports }} other founder{{ seen.reports === 1 ? "'s report" : "s' reports" }}
+        <span class="muted">Seen before</span> Shortlisted in {{ seen.reports }} other report{{ seen.reports === 1 ? "" : "s" }}
         <template v-if="seen.sectors.length"> ({{ seen.sectors.join(", ") }})</template><template v-if="seenAudit">; Nemotron rated it {{ seenAudit }}</template>.
         <span class="muted">Last {{ seen.lastSeen }}.</span>
       </p>

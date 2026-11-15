@@ -83,7 +83,7 @@ Nemotron runs with reasoning off by default: on a 60-fact report it answers in a
 
 ## Storage on Aiven (tech challenge)
 
-**Aiven for PostgreSQL** keeps every finished report, so a shared link (`/r/<runId>`) survives redeploys and server rebuilds. A report is one row (profile and events as JSONB) plus one row per shortlisted investor with its fit score, graph verification and Nemotron verdict. That second table powers a feature files could not: on each investor card, **"Seen before: shortlisted in 3 other founders' reports (fintech, climate tech); Nemotron rated it 2 supported, 1 weak"**. It is one grouped query with `count(*) FILTER (...)`, and it exposes only investor names, counts and sectors, never another founder's data.
+**Aiven for PostgreSQL** keeps every finished report, so a shared link (`/r/<runId>`) survives redeploys and server rebuilds. A report is one row (profile and events as JSONB) plus one row per shortlisted investor with its fit score, graph verification and Nemotron verdict. That second table powers a feature files could not: on each investor card, **"Seen before: shortlisted in 6 other reports (climate tech software, defence tech); Nemotron rated it 4 supported, 1 contradicted"** (Lifeline Ventures on the sample report). It is one grouped query with `count(*) FILTER (...)`, and it exposes only investor names, counts and sectors, never another founder's data.
 
 **Aiven for Valkey** holds the API response cache with native expiry (Cala 24 h, live web 1 h) and the per-IP rate limit, a sliding window kept atomic by a Lua script. Every backend worker and every redeploy shares the same cache and the same limit.
 
