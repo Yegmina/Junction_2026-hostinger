@@ -345,12 +345,12 @@ h3 { font-size: 44px; line-height: 1.1; font-weight: 600; }
 <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:40px; margin-top:24px;">
 <div class="card rise" style="--i:0;"><h3 style="font-size:44px;">Real investors only</h3><p class="body">A lead is kept only if its name appears in Cala evidence.</p></div>
 <div class="card rise" style="--i:1;"><h3 style="font-size:44px;">Every claim cited</h3><p class="body">Evidence chips open the exact fact and its source.</p></div>
-<div class="card rise" style="--i:2;"><h3 style="font-size:44px;">Fast</h3><p class="body">Shortlist and forecast run in parallel; Cala answers cached for 24 h.</p></div>
+<div class="card rise" style="--i:2;"><h3 style="font-size:44px;">Fast</h3><p class="body">Shortlist and forecast run in parallel; Cala and web answers cached in Aiven for Valkey.</p></div>
 <div class="card rise" style="--i:3;"><h3 style="font-size:44px;">Reliable demo</h3><p class="body">Example chips replay real recorded runs in about 9 s.</p></div>
 <div class="card rise" style="--i:4;"><h3 style="font-size:44px;">Resilient</h3><p class="body">Gemini retries, then falls back to a smaller model.</p></div>
-<div class="card rise" style="--i:5;"><h3 style="font-size:44px;">Shareable</h3><p class="body">Report links, investor list export, intro email drafts.</p></div>
+<div class="card rise" style="--i:5;"><h3 style="font-size:44px;">Remembered</h3><p class="body">Reports live in Aiven for PostgreSQL; each investor shows how other reports rated it.</p></div>
 </div>
-<aside>A few design choices make this trustworthy. The AI can’t invent investors: a name is dropped unless it appears in Cala’s evidence. Every claim links to its source. For the demo, example chips replay real recorded runs, so they never fail on stage, and any edited input runs the full live pipeline. It runs over HTTPS with shareable report links.</aside>
+<aside>A few design choices make this trustworthy. The AI can’t invent investors: a name is dropped unless it appears in Cala’s evidence. Every claim links to its source. For the demo, example chips replay real recorded runs, so they never fail on stage, and any edited input runs the full live pipeline. Every report is stored in Aiven for PostgreSQL, so links survive redeploys, and each investor card shows how often other reports shortlisted it and how the audit rated it. The cache and the rate limit run on Aiven for Valkey.</aside>
 </section>
 <section id="limits" class="alt">
 <div class="head">
