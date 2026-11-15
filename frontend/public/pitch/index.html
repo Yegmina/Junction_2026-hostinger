@@ -252,22 +252,6 @@ h3 { font-size: 44px; line-height: 1.1; font-weight: 600; }
 <p class="small">Timings from the recorded live run for Ledgerly (CSRD reporting SaaS, €2.5M seed). The shortlist is ready before the scenarios finish.</p>
 <aside>Here is a real run. First, four Cala calls run in parallel and return 50 sourced facts. Then two lanes start at once. The shortlist lane maps who backs the competitors in Cala’s graph, has three AI partners debate, and checks each lead in the graph again. The forecast lane builds drivers, a 2-by-2 scenario matrix and the chance to close. Everything streams to the screen as it happens, so the founder sees who to pitch first after about 46 seconds.</aside>
 </section>
-<section id="cala" class="alt">
-<div class="head">
-<p class="eyebrow">HOW IT USES CALA</p>
-<h2>Search, query, then walk the graph</h2>
-</div>
-<table class="cala-table fade" style="font-size:34px;">
-<tr><th style="width:24%;">Cala feature</th><th style="width:34%;">Call</th><th style="width:42%;">What the founder gets</th></tr>
-<tr><td>Knowledge search</td><td>POST /v1/knowledge/search</td><td>Competitors, rounds, lead investors, sourced</td></tr>
-<tr><td>Cala QL query</td><td>POST /v1/knowledge/query</td><td>Top-funded sector companies and investors</td></tr>
-<tr><td>Entity resolution</td><td>GET /v1/entities + introspection</td><td>Each investor matched to a real entity</td></tr>
-<tr><td>Graph traversal</td><td>POST /v1/entities/{id}</td><td>Portfolios, competitor backers, round sizes</td></tr>
-<tr><td>People edges</td><td>FOUNDED, IS_CEO_OF, IS_CTO_OF</td><td>Portfolio founders as warm intro paths</td></tr>
-</table>
-<p class="lede" style="margin-top:24px; font-size:34px;">Every report prints its own usage line. Ledgerly’s: <b>3 knowledge searches · 1 structured query · 83 entity lookups · 255 graph relationships.</b></p>
-<aside>Cala is not a side feature here, it is the backbone. Search and Cala QL give sourced facts. Then we walk the knowledge graph: we resolve each investor to a real entity, read its portfolio and its funding rounds, find who backs each competitor, and follow FOUNDED and CEO edges to find people who can make an intro. Every report counts and shows exactly how many Cala calls it used.</aside>
-</section>
 <section id="checks">
 <div class="head">
 <p class="eyebrow">GRAPH CHECKS</p>
@@ -352,18 +336,21 @@ h3 { font-size: 44px; line-height: 1.1; font-weight: 600; }
 </div>
 <aside>A few design choices make this trustworthy. The AI can’t invent investors: a name is dropped unless it appears in Cala’s evidence. Every claim links to its source. For the demo, example chips replay real recorded runs, so they never fail on stage, and any edited input runs the full live pipeline. Every report is stored in Aiven for PostgreSQL, so links survive redeploys, and each investor card shows how often other reports shortlisted it and how the audit rated it. The cache and the rate limit run on Aiven for Valkey.</aside>
 </section>
-<section id="limits" class="alt">
+<section id="cala" class="alt">
 <div class="head">
-<p class="eyebrow">LIMITATIONS</p>
-<h2>What it does not claim</h2>
+<p class="eyebrow">HOW IT USES CALA</p>
+<h2>Search, query, then walk the graph</h2>
 </div>
-<ul class="points" style="width:1560px; font-size:38px; display:flex; flex-direction:column; gap:40px; margin-top:24px;">
-<li>A warm intro is a graph link: the person founded or runs a company this investor funded. It does not mean they know you.</li>
-<li>Round sizes are whole rounds the investor joined, not its own cheque. USD is converted at a fixed rate.</li>
-<li>Graph coverage varies: some investors have no round data, so no round-size line is shown.</li>
-<li>The chance to close is a structured judgement from sourced evidence, not a model trained on outcomes.</li>
-</ul>
-<aside>We want to be upfront about the limits. Intro paths are links in the graph, not friendships. Round sizes are total rounds, not the investor’s own cheque. Coverage depends on Cala’s graph. And the probability is a structured, evidence-based judgement, not a trained predictor. With outcome data, that last one is the natural next step.</aside>
+<table class="cala-table fade" style="font-size:34px;">
+<tr><th style="width:24%;">Cala feature</th><th style="width:34%;">Call</th><th style="width:42%;">What the founder gets</th></tr>
+<tr><td>Knowledge search</td><td>POST /v1/knowledge/search</td><td>Competitors, rounds, lead investors, sourced</td></tr>
+<tr><td>Cala QL query</td><td>POST /v1/knowledge/query</td><td>Top-funded sector companies and investors</td></tr>
+<tr><td>Entity resolution</td><td>GET /v1/entities + introspection</td><td>Each investor matched to a real entity</td></tr>
+<tr><td>Graph traversal</td><td>POST /v1/entities/{id}</td><td>Portfolios, competitor backers, round sizes</td></tr>
+<tr><td>People edges</td><td>FOUNDED, IS_CEO_OF, IS_CTO_OF</td><td>Portfolio founders as warm intro paths</td></tr>
+</table>
+<p class="lede" style="margin-top:24px; font-size:34px;">Every report prints its own usage line. Ledgerly’s: <b>3 knowledge searches · 1 structured query · 83 entity lookups · 255 graph relationships.</b></p>
+<aside>To wrap up: Cala is not a side feature here, it is the backbone. Search and Cala QL give sourced facts. Then we walk the knowledge graph: we resolve each investor to a real entity, read its portfolio and its funding rounds, find who backs each competitor, and follow FOUNDED and CEO edges to find people who can make an intro. Every report counts and shows exactly how many Cala calls it used.</aside>
 </section>
 <section id="close" class="dark">
 <div class="head rise" style="gap:24px; --i:0;">
