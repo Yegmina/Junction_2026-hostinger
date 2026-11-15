@@ -1,8 +1,5 @@
-# Every push and pull request is built and tested on CRACI runners (runs-on: craci).
-# Each job declares a deny-by-default network policy: it may reach only the package registries it
-# needs, so CRACI can record a complete SBOM and a network trace, and anything unexpected
-# (a compromised dependency calling home, a test hitting a live API) is blocked and shows up as a
-# proxy violation. The supply-chain workflow then pulls those SBOMs and traces through the CRACI API.
+# Every push and pull request: backend tests against PostgreSQL 18 and Valkey 9 (the engines
+# Aiven runs in production), the frontend build, and a smoke test of the whole Docker stack.
 name: CI
 
 on:
@@ -20,21 +17,15 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend tests (PostgreSQL 17 + Valkey 8)
-    runs-on: craci
+    name: Backend tests (PostgreSQL 18 + Valkey 9)
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: cracicorp/setup@v1
-        with:
-          size: "2"
-          network: |
-            default: deny
-            presets: [github, pypi, dockerhub]
       - uses: actions/checkout@v4
       - name: Start PostgreSQL and Valkey (the engines Aiven runs in production)
         run: |
-          docker run -d --name pg -e POSTGRES_PASSWORD=ci -p 127.0.0.1:5432:5432 --tmpfs /var/lib/postgresql/data postgres:17-alpine
-          docker run -d --name vk -p 127.0.0.1:6379:6379 valkey/valkey:8-alpine
+          docker run -d --name pg -e POSTGRES_PASSWORD=ci -p 127.0.0.1:5432:5432 --tmpfs /var/lib/postgresql postgres:18-alpine
+          docker run -d --name vk -p 127.0.0.1:6379:6379 valkey/valkey:9-alpine
       - name: Install
         working-directory: backend
         run: |
@@ -52,15 +43,9 @@ jobs:
 
   frontend:
     name: Frontend build
-    runs-on: craci
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: cracicorp/setup@v1
-        with:
-          size: "2"
-          network: |
-            default: deny
-            presets: [github, npm]
       - uses: actions/checkout@v4
       - name: Install and build
         working-directory: frontend
@@ -71,15 +56,9 @@ jobs:
   stack:
     name: Docker stack smoke test
     needs: [backend, frontend]
-    runs-on: craci
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: cracicorp/setup@v1
-        with:
-          size: "4"
-          network: |
-            default: deny
-            presets: [github, dockerhub, pypi, npm]
       - uses: actions/checkout@v4
       - name: Build and start the stack
         run: docker compose -p ci -f docker-compose.yml -f docker-compose.ci.yml up -d --build --wait

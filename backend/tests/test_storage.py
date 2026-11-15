@@ -1,7 +1,7 @@
 """Aiven storage: reports in PostgreSQL, cache and rate limits in Valkey, and the file fallback.
 
-The service tests run when TEST_DATABASE_URL / TEST_VALKEY_URL are set (CI starts PostgreSQL 17 and
-Valkey 8 containers; Aiven runs the same engines). The fallback tests always run.
+The service tests run when TEST_DATABASE_URL / TEST_VALKEY_URL are set (CI starts PostgreSQL 18 and
+Valkey 9 containers; Aiven runs the same engines). The fallback tests always run.
 """
 import asyncio
 import os

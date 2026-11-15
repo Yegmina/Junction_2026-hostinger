@@ -16,7 +16,6 @@ Will your round close, and who should you pitch first? Unicorn Oracle answers bo
 | Tech | **Best agentic use case of Oxylabs Web API** | Live search-to-scrape for each investor's latest deals, quoted with the source URL |
 | Tech | **Best Use of Nemotron** by NVIDIA | Nemotron 3.5 Super VL independently audits Gemini's shortlist and demotes contradicted leads |
 | Tech | **Best Use of Aiven** | Aiven for PostgreSQL stores every report and answers cross-report investor history; Aiven for Valkey holds the API cache and the shared rate limit |
-| Tech | **Best use of CRACI** | Every push is tested on CRACI runners with deny-by-default network policies; SBOMs and network traces are pulled back through the CRACI API |
 
 ## Judge it in 30 seconds
 
@@ -82,7 +81,7 @@ What the audit has caught in recorded runs:
 
 Nemotron runs with reasoning off by default: on a 60-fact report it answers in about 3 seconds instead of about 55, with a similarly specific audit. Set `NEMOTRON_REASONING=on` to switch it back on.
 
-## Storage on Aiven, builds on CRACI (tech challenges)
+## Storage on Aiven (tech challenge)
 
 **Aiven for PostgreSQL** keeps every finished report, so a shared link (`/r/<runId>`) survives redeploys and server rebuilds. A report is one row (profile and events as JSONB) plus one row per shortlisted investor with its fit score, graph verification and Nemotron verdict. That second table powers a feature files could not: on each investor card, **"Seen before: shortlisted in 3 other founders' reports (fintech, climate tech); Nemotron rated it 2 supported, 1 weak"**. It is one grouped query with `count(*) FILTER (...)`, and it exposes only investor names, counts and sectors, never another founder's data.
 
@@ -95,13 +94,11 @@ Nemotron runs with reasoning off by default: on a 60-fact report it answers in a
 
 A failed service is skipped for 60 seconds and logged once, so a database outage never costs a report or slows a run. `/api/health` names the storage in use. Reports saved as files before the database existed import with `python -m app.runs import-files`.
 
-**CRACI** runs CI (`.github/workflows/ci.yml`, `runs-on: craci`). Three jobs:
+**CI** (`.github/workflows/ci.yml`) runs on every push:
 
-- backend tests against PostgreSQL 17 and Valkey 8 containers (the engines Aiven runs);
+- backend tests against PostgreSQL 18 and Valkey 9 containers (the engines Aiven runs);
 - the frontend build;
 - a smoke test of the whole Docker stack through nginx. It replays an example, reads the report back from PostgreSQL, checks investor history and the Valkey rate limit (3 runs, then 429), then deletes the backend container and its data volume and checks the report is still there.
-
-Each job declares a deny-by-default network policy (`cracicorp/setup` with only the registries it needs: PyPI, npm, Docker Hub, GitHub). CRACI can then record a complete SBOM and a network trace, and a test that tried to call a live API, or a dependency that phoned home, would be blocked and listed as a proxy violation. After each CI run, `.github/workflows/supply-chain.yml` fetches every job's CycloneDX SBOM and network trace through the CRACI API (`/v1preview1/sbom`, `/v1preview1/network-trace`), attaches them to the run, writes a summary table, and fails if any job reached a host outside the expected registries.
 
 ## Limitations
 
