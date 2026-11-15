@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nemotron in Unicorn Oracle</title>
+<meta name="description" content="How Unicorn Oracle uses NVIDIA Nemotron to audit an AI investor shortlist. Junction 2026.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&family=Inter:wght@400;600&display=swap">
+<style>
+* { margin:0 }
+html,body { height:100%; background:#0D0E1A; overflow:hidden; }
+#stage { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
+#deck { width:1920px; height:1080px; position:relative; flex-shrink:0; }
+#deck > section { position:absolute; inset:0; width:1920px; height:1080px; overflow:hidden; display:none !important; }
+#deck > section.on { display:flex !important; }
+#deck aside { display:none; }
+x-shape { display:block; }
+x-shape[kind="arrow-right"] { clip-path: polygon(0 30%, 60% 30%, 60% 0, 100% 50%, 60% 100%, 60% 70%, 0 70%); height:28px !important; width:44px !important; }
+table { width:100%; border-collapse:collapse; }
+th,td { padding:.35em .6em; text-align:left; border-bottom:2px solid #DEDBEE; }
+th { font-weight:600; }
+#ui { position:fixed; right:16px; bottom:12px; display:flex; gap:8px; align-items:center; font:14px Inter,Arial,sans-serif; color:#B8B6D3; z-index:9; }
+#ui button { background:#25273F; color:#ECEBF7; border:0; border-radius:8px; padding:8px 12px; font:inherit; cursor:pointer; }
+#ui button:hover { background:#5B3DF5; }
+</style>
+<style>section {
+  --ink: #15172B;
+  --paper: #F6F5FB;
+  --paper-2: #ECEAF6;
+  --card: #FDFCFF;
+  --line: #DEDBEE;
+  --soft: #4A4F66;
+  --violet: #5B3DF5;
+  --violet-light: #A99BFF;
+  --teal: #00756F;
+  --red: #B42F25;
+  --on-dark: #ECEBF7;
+  --on-dark-soft: #B8B6D3;
+  box-sizing: border-box;
+  padding: 128px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Inter', Arial, sans-serif;
+  font-size: 32px;
+  counter-increment: page;
+}
+section.alt { background: var(--paper-2); }
+section.dark { background: var(--ink); color: var(--on-dark); }
+section.violet { background: var(--violet); color: #FBFAFF; }
+section.footed { padding: 128px 128px 160px; }
+
+h1, h2, h3 { font-family: 'Space Grotesk', Arial, sans-serif; font-weight: 700; color: inherit; }
+h1 { font-size: 120px; line-height: 1.0; }
+h2 { font-size: 72px; line-height: 1.05; }
+h3 { font-size: 44px; line-height: 1.1; font-weight: 600; }
+
+.eyebrow { font-size: 24px; font-weight: 600; letter-spacing: 3px; color: var(--violet); }
+.dark .eyebrow { color: var(--violet-light); }
+.violet .eyebrow { color: #E4DEFF; }
+.lede { font-size: 32px; line-height: 1.4; color: var(--soft); }
+.dark .lede { color: var(--on-dark-soft); }
+.small { font-size: 24px; line-height: 1.4; color: var(--soft); }
+.dark .small { color: var(--on-dark-soft); }
+.head { display: flex; flex-direction: column; gap: 16px; }
+
+.cards { display: flex; gap: 32px; }
+.card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 40px;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 24px;
+}
+.card .body { font-size: 32px; line-height: 1.4; color: var(--soft); }
+.card .tag { font-size: 24px; font-weight: 600; color: var(--violet); }
+
+.shot { border: 2px solid var(--line); border-radius: 20px; object-fit: contain; background: #FFFFFF; }
+
+.footer {
+  position: absolute;
+  left: 128px;
+  bottom: 64px;
+  width: 1664px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 24px;
+  color: var(--soft);
+}
+.dark .footer { color: var(--on-dark-soft); }
+
+.rise { animation: rise 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 110ms); }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade { animation: fade 700ms ease-out both; animation-delay: calc(var(--i, 0) * 110ms); }
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Flow slide */
+.flow { display: flex; align-items: center; gap: 24px; }
+.flow .stage, .flow .step, .flow .arrow, .flow .lane-label { box-sizing: border-box; flex-shrink: 0; }
+.flow .stage { display: flex; flex-direction: column; gap: 12px; padding: 32px; background: var(--card); border: 2px solid var(--line); border-radius: 20px; }
+.flow .stage .body { font-size: 26px; line-height: 1.35; color: var(--soft); }
+.flow .stage .time { font-size: 24px; font-weight: 600; color: var(--teal); }
+.flow .lanes { display: flex; flex-direction: column; gap: 24px; }
+.flow .lane { display: flex; align-items: center; gap: 16px; }
+.flow .lane-label { width: 150px; font-size: 24px; font-weight: 600; color: var(--violet); }
+.flow .step { width: 220px; padding: 20px 24px; background: var(--card); border: 2px solid var(--line); border-radius: 16px; }
+.flow .step p { font-size: 26px; line-height: 1.3; }
+.flow .step .time { color: var(--teal); font-weight: 600; }
+.flow .arrow { width: 36px; height: 18px; background: var(--violet-light); }
+.flow .report { background: var(--ink); color: var(--on-dark); border-color: var(--ink); }
+.flow .report .body { color: var(--on-dark-soft); }
+.flow .report .time { color: #6FE0D6; }
+
+/* Numbers slide */
+.stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 56px 48px; }
+.stat { display: flex; flex-direction: column; gap: 8px; }
+.stat .big { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 120px; font-weight: 700; line-height: 1.0; color: #FBFAFF; }
+.stat .label { font-size: 28px; line-height: 1.35; color: #E4DEFF; }
+.verdict { font-size: 32px; line-height: 1.4; color: #FBFAFF; padding: 24px 32px; border: 2px solid #8D78FF; border-radius: 20px; }
+
+/* Table slide */
+.cala-table { font-size: 26px; color: var(--ink); }
+
+/* Lists */
+.points { font-size: 32px; line-height: 1.45; color: var(--ink); padding-left: 40px; }
+.dark .points { color: var(--on-dark); }
+
+/* Checks row */
+.checks { display: flex; gap: 24px; }
+.check { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 36px; background: var(--card); border: 2px solid var(--line); border-radius: 20px; }
+.check .title { font-size: 36px; font-weight: 600; color: var(--ink); }
+.check .body { font-size: 28px; line-height: 1.35; color: var(--soft); }
+.check.warn .title { color: var(--red); }
+.check.ok .title { color: var(--teal); }
+
+.url { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 56px; font-weight: 600; color: var(--violet-light); }
+</style>
+</head><body>
+<div id="stage"><div id="deck">
+<section id="cover" class="dark footed">
+<div class="head rise" style="gap:32px; --i:0; margin-top:120px;">
+<p class="eyebrow">JUNCTION 2026 · BEST USE OF NEMOTRON</p>
+<h1>Two models,<br>one honest shortlist</h1>
+<p class="lede" style="width:1200px;">Unicorn Oracle tells first-time founders who to pitch. Gemini proposes the investors; NVIDIA Nemotron audits every lead against the evidence before the founder sees it.</p>
+</div>
+<img class="rise" src="../nvidia-logo.png" alt="NVIDIA logo" style="width:300px; height:58px; object-fit:contain; object-position:left; filter:brightness(0) invert(1); --i:1;">
+<div class="footer"><span>93-127-213-190.sslip.io</span><span>Unicorn Oracle</span></div>
+<aside>We built Unicorn Oracle, which tells a first-time founder which investors to pitch first. One model proposes the shortlist, and NVIDIA Nemotron, a model from a different family, audits every lead against the evidence before the founder ever sees it.</aside>
+</section>
+<section id="why">
+<div class="head">
+<p class="eyebrow">WHY THIS USE CASE</p>
+<h2>Investor advice needs an auditor</h2>
+</div>
+<div class="cards">
+<div class="card rise" style="--i:0;"><p class="tag">HIGH STAKES</p><h3>A wrong lead costs real money</h3><p class="body">Pitching a rival’s investor wastes the meeting and can put your plan in a competitor’s board pack.</p></div>
+<div class="card rise" style="--i:1;"><p class="tag">CHECKABLE</p><h3>There is ground truth</h3><p class="body">Every claim maps to sourced facts and Cala knowledge-graph edges, so an auditor can prove a lead right or wrong.</p></div>
+<div class="card rise" style="--i:2;"><p class="tag">LLMS SOUND SURE</p><h3>Fluent is not correct</h3><p class="body">The first model writes confident rationales, even when the graph says otherwise. Self-review shares its blind spots.</p></div>
+</div>
+<aside>Why is this the right place for Nemotron? Three reasons. The stakes are real: pitching an investor who already backs your competitor wastes the meeting and can leak your plan. The answers are checkable: every claim maps to sourced facts and graph edges, so an auditor can prove a lead right or wrong. And language models sound sure even when they are wrong; asking the same model to review itself shares its blind spots.</aside>
+</section>
+<section id="built" class="alt">
+<div class="head">
+<p class="eyebrow">WHAT WE BUILT</p>
+<h2>Propose, check, audit, re-rank</h2>
+</div>
+<div class="flow" style="flex:1;">
+<div class="stage rise" style="width:330px; --i:0;"><h3 style="font-size:36px;">Gemini proposes</h3><p class="body">Three AI partners debate a shortlist and cite evidence ids</p></div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="stage rise" style="width:330px; --i:1;"><h3 style="font-size:36px;">Code checks</h3><p class="body">Which cited facts actually name each investor? Graph: deals, round sizes, competitor stakes</p></div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="stage report rise" style="width:400px; --i:2;"><h3 style="font-size:36px;">Nemotron audits</h3><p class="body">Reads all evidence (Cala graph + live web) and rates each lead <b style="color:#6FE0D6;">supported</b>, weak or <b style="color:#FF8A80;">contradicted</b>, with a reason and the facts it used</p></div>
+<x-shape kind="arrow-right" class="arrow"></x-shape>
+<div class="stage rise" style="width:330px; --i:3;"><h3 style="font-size:36px;">Re-rank</h3><p class="body">Weak leads move down, contradicted ones go last; the verdict shows on every card</p></div>
+</div>
+<p class="small">nvidia/nemotron-3.5-super-vl-120b-a12b on build.nvidia.com · strict JSON schema · one call per report, about 3 s</p>
+<aside>Here is the loop. Gemini, as three investment partners, proposes a shortlist and cites evidence. Before Nemotron sees it, plain code checks which cited facts actually name each investor, and the graph checks deals, round sizes and competitor stakes. Then Nemotron reads all the evidence and rates each lead supported, weak or contradicted, with a short reason and the facts it relied on. Contradicted leads drop to the bottom, and the verdict is shown on every investor card. One call per report, about three seconds.</aside>
+</section>
+<section id="catches">
+<div class="head">
+<p class="eyebrow">CAUGHT IN REAL RUNS</p>
+<h2>What the second model caught</h2>
+</div>
+<div style="display:flex; gap:48px; align-items:flex-start;">
+<div style="width:640px; display:flex; flex-direction:column; gap:28px;">
+<div class="check warn rise" style="--i:0;"><p class="title">Contradicted</p><p class="body">Gemini said Lifeline Ventures does not back drone rival Kelluu. Nemotron: the Cala graph shows that investment.</p></div>
+<div class="check rise" style="--i:1;"><p class="title" style="color:#9A6700;">Weak, non-dilutive</p><p class="body">Gemini ranked grant agency Business Finland first for an equity round. Nemotron: a grant body cannot lead it. Rated weak in 3 of 3 runs.</p></div>
+</div>
+<img class="shot fade" src="../audit-card.png" alt="Investor card with the Nemotron audit: Superhero Capital rated weak evidence because it backs a competitor" style="width:1000px; height:458px; --i:2;">
+</div>
+<aside>Two real catches. In a defence-drone run, Gemini claimed Lifeline Ventures does not back the competitor Kelluu. Nemotron marked it contradicted, because the Cala graph shows that investment. In another run, Gemini put Business Finland, a grant agency, first for an equity round. Nemotron rated it weak: a grant body cannot lead an equity round. On the right is how a verdict looks to the founder, with its reason and evidence one click away.</aside>
+</section>
+<section id="role" class="violet">
+<div class="head">
+<p class="eyebrow">WHY IT IS KEY TO OUR EVALUATION</p>
+<h2>The last gate before a founder sees the ranking</h2>
+</div>
+<div class="stats">
+<div class="stat rise" style="--i:0;"><p class="big">Final</p><p class="label">its verdict sets the final order: weak down, contradicted last</p></div>
+<div class="stat rise" style="--i:1;"><p class="big">Cited</p><p class="label">every verdict names its evidence; unknown ids are dropped</p></div>
+<div class="stat rise" style="--i:2;"><p class="big">≠</p><p class="label">a different model family from the one that proposed</p></div>
+<div class="stat rise" style="--i:3;"><p class="big">~3 s</p><p class="label">per report, reasoning off (on: ~55 s, similar audits)</p></div>
+<div class="stat rise" style="--i:4;"><p class="big">6/6</p><p class="label">valid audits with a strict JSON schema (free JSON broke ~1 in 3)</p></div>
+<div class="stat rise" style="--i:5;"><p class="big">Safe</p><p class="label">if the audit fails, the report still ships, shortlist unchanged</p></div>
+</div>
+<aside>This is why Nemotron is central to how we evaluate a shortlist. It is the last gate: its verdict decides the order a founder pitches in. Every verdict names its evidence, and we drop any evidence id that does not exist. It is a different model family from the proposer. It is fast enough to run on every report, about three seconds with reasoning off; with reasoning on it takes about 55 seconds for similar audits. A strict JSON schema made it reliable: six of six valid, where free-form JSON broke about one time in three. And if it ever fails, the report still ships, unchanged.</aside>
+</section>
+<section id="close" class="dark">
+<div class="head rise" style="gap:24px; --i:0;">
+<p class="eyebrow">WHAT WE LEARNED · TRY IT</p>
+<h2>Ground the auditor, then trust it to re-rank</h2>
+</div>
+<ul class="points rise" style="--i:1; width:1500px;">
+<li>Give the auditor facts, not wording: a deterministic citation check first</li>
+<li>Enforce the output schema on the server; treat running out of tokens as an error</li>
+<li>One domain rule fixed a whole class of mistakes (grant bodies cannot lead equity rounds)</li>
+<li>Next: send Nemotron’s reasons back to Gemini for one revision round</li>
+</ul>
+<p class="url rise" style="--i:2;">93-127-213-190.sslip.io</p>
+<p class="lede rise" style="--i:3;">Click “Defence drones” for a 9-second replay of a real run, then open Investors.</p>
+<aside>What we learned: give the auditor facts, not wording, by running a deterministic citation check first. Enforce the output schema on the server, and treat running out of tokens as an error. One domain rule fixed a whole class of mistakes. Next we want Nemotron’s reasons to go back to Gemini for one revision round. Try it: click Defence drones for a nine-second replay of a real run, then open the Investors tab. Thank you.</aside>
+</section>
+</div></div>
+<div id="ui"><button id="prev" aria-label="Previous slide">‹</button><span id="num"></span><button id="next" aria-label="Next slide">›</button><button id="fs" aria-label="Full screen">⛶</button></div>
+<script>
+const S=[...document.querySelectorAll('#deck > section')],deck=document.getElementById('deck'),num=document.getElementById('num');
+let i=Math.min(Math.max((parseInt(location.hash.slice(1))||1)-1,0),S.length-1);
+function fit(){const k=Math.min(innerWidth/1920,innerHeight/1080);deck.style.transform='scale('+k+')';}
+function show(n){i=Math.min(Math.max(n,0),S.length-1);S.forEach(s=>s.classList.remove('on'));void deck.offsetWidth;S[i].classList.add('on');num.textContent=(i+1)+' / '+S.length;history.replaceState(null,'','#'+(i+1));}
+function toggleFs(){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();}
+addEventListener('resize',fit);
+addEventListener('keydown',e=>{if(['ArrowRight','PageDown',' ','Enter'].includes(e.key)){e.preventDefault();show(i+1)}else if(['ArrowLeft','PageUp','Backspace'].includes(e.key)){e.preventDefault();show(i-1)}else if(e.key==='Home')show(0);else if(e.key==='End')show(S.length-1);else if(e.key==='f')toggleFs();});
+document.getElementById('prev').onclick=()=>show(i-1);document.getElementById('next').onclick=()=>show(i+1);document.getElementById('fs').onclick=toggleFs;
+document.getElementById('stage').addEventListener('click',e=>{if(e.target.closest('a'))return;show(e.clientX>innerWidth/3?i+1:i-1);});
+let tx=null;addEventListener('touchstart',e=>tx=e.touches[0].clientX,{passive:true});addEventListener('touchend',e=>{if(tx===null)return;const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>40)show(d<0?i+1:i-1);tx=null;});
+fit();show(i);
+</script>
+</body></html>
